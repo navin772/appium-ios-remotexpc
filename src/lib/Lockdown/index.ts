@@ -44,7 +44,9 @@ const promptUserToSelectUDID = async (devices: Device[]): Promise<string> => {
       console.log('Select a device UDID:');
       devices.forEach((d, i) => {
         const prefix = i === selected ? '>' : ' ';
-        console.log(`${prefix} ${d.Properties.SerialNumber} - ${d.Properties.ConnectionType}`);
+        console.log(
+          `${prefix} ${d.Properties.SerialNumber} - ${d.Properties.ConnectionType}`,
+        );
       });
     };
 
