@@ -10,6 +10,9 @@
       "types": "./build/src/index.d.ts"
     }
   },
+  "engines": {
+    "node": ">=20 <23"
+  },
   "scripts": {
     "clean:build": "rimraf ./build",
     "build:es": "tsc",
