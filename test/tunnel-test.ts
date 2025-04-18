@@ -10,12 +10,11 @@ async function test() {
   const tunManager = TunnelManager;
   let tunnelResult: TunnelConnection;
   console.log('create connection....');
-  const udid = '';
-  const { lockdownService, device } = await createLockdownServiceByUDID(udid);
+  const { lockdownService, device } = await createLockdownServiceByUDID();
   const { socket } = await startCoreDeviceProxy(
     lockdownService,
     device.DeviceID,
-    udid,
+    device.Properties.SerialNumber,
     {},
   );
   try {
