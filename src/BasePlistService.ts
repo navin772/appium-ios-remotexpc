@@ -12,6 +12,13 @@ type PlistMessage = Record<string, unknown>;
  */
 export abstract class BasePlistService {
   /**
+   * Closes the underlying connection
+   */
+  public close(): void {
+    this._plistService.close();
+  }
+
+  /**
    * The underlying PlistService instance
    */
   protected _plistService: PlistService;
@@ -56,12 +63,5 @@ export abstract class BasePlistService {
    */
   protected async receive(timeout?: number): Promise<PlistMessage> {
     return this._plistService.receivePlist(timeout);
-  }
-
-  /**
-   * Closes the underlying connection
-   */
-  public close(): void {
-    this._plistService.close();
   }
 }

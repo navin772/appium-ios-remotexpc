@@ -12,7 +12,7 @@ interface ServicesResponse {
 }
 
 class RemoteXPCConnection {
-  private address: [string, number];
+  private readonly address: [string, number];
   private socket: net.Socket | undefined;
   private handshake: Handshake | undefined;
   private _isConnected: boolean;
@@ -73,12 +73,12 @@ class RemoteXPCConnection {
         this.socket.once('connect', async () => {
           try {
             this._isConnected = true;
-            // @ts-ignore
-            this.handshake = new Handshake(this.socket);
-
-            // Once handshake is successful we can get
-            // peerinfo and get ports for lockdown in RSD
-            await this.handshake.perform();
+            if (this.socket) {
+              this.handshake = new Handshake(this.socket);
+              // Once handshake is successful we can get
+              // peer-info and get ports for lockdown in RSD
+              await this.handshake.perform();
+            }
           } catch (error) {
             console.error('Handshake failed:', error);
             await this.close();
@@ -108,13 +108,6 @@ class RemoteXPCConnection {
       });
     }
     return Promise.resolve();
-  }
-
-  /**
-   * Check if connected to the remote device
-   */
-  isConnected(): boolean {
-    return this._isConnected;
   }
 
   /**
@@ -149,16 +142,6 @@ class RemoteXPCConnection {
         Check if the device is locked.`);
     }
     return service;
-  }
-
-  /**
-   * Get the port for a specific service
-   * @param serviceName The name of the service to get the port for
-   * @returns The port number as a string
-   */
-  getServicePort(serviceName: string): string {
-    const service = this.findService(serviceName);
-    return service.port;
   }
 }
 
