@@ -11,11 +11,32 @@ type PlistMessage = Record<string, unknown>;
  * Base class for services that use PlistService for communication
  */
 export abstract class BasePlistService {
+
+  /**
+   * Sends a message and waits for a response
+   * @param message The message to send
+   * @param timeout Timeout in milliseconds
+   * @returns Promise resolving to the response
+   */
+  async sendAndReceive(
+    message: PlistMessage,
+    timeout?: number,
+  ): Promise<PlistMessage> {
+    return this._plistService.sendPlistAndReceive(message, timeout);
+  }
+
   /**
    * Closes the underlying connection
    */
   public close(): void {
     this._plistService.close();
+  }
+
+  /**
+   * Gets the PlistService instance
+   */
+  protected getPlistService(): PlistService {
+    return this._plistService;
   }
 
   /**
@@ -33,19 +54,6 @@ export abstract class BasePlistService {
     } else {
       this._plistService = new PlistService(plistServiceOrSocket);
     }
-  }
-
-  /**
-   * Sends a message and waits for a response
-   * @param message The message to send
-   * @param timeout Timeout in milliseconds
-   * @returns Promise resolving to the response
-   */
-  async sendAndReceive(
-    message: PlistMessage,
-    timeout?: number,
-  ): Promise<PlistMessage> {
-    return this._plistService.sendPlistAndReceive(message, timeout);
   }
 
   /**

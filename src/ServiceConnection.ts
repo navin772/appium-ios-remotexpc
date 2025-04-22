@@ -10,11 +10,8 @@ export interface ServiceConnectionOptions {
  * ServiceConnection for communicating with Apple device services over TCP
  */
 export class ServiceConnection extends BasePlistService {
-  private readonly socket: net.Socket;
-
   constructor(socket: net.Socket) {
     super(socket);
-    this.socket = socket;
   }
 
   /**
@@ -61,7 +58,7 @@ export class ServiceConnection extends BasePlistService {
    * Gets the underlying socket
    */
   getSocket(): net.Socket {
-    return this.socket;
+    return this.getPlistService().getSocket() as net.Socket;
   }
 
   /**

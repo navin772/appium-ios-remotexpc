@@ -14,6 +14,13 @@ type PlistMessage = Record<string, unknown>;
  * Service for communication using plist protocol
  */
 export class PlistService {
+  /**
+   * Gets the underlying socket
+   * @returns The socket used by this service
+   */
+  public getSocket(): Socket | TLSSocket {
+    return this.socket;
+  }
   private readonly socket: Socket | TLSSocket;
   private readonly splitter: LengthBasedSplitter;
   private readonly decoder: PlistServiceDecoder;
