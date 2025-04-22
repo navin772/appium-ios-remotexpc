@@ -1,5 +1,5 @@
 import net from 'node:net';
-import { BasePlistService } from './BasePlistService.js';
+import { BasePlistService } from './base-plist-service.js';
 
 export interface ServiceConnectionOptions {
   keepAlive?: boolean;
