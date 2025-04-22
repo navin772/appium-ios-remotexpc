@@ -5,10 +5,9 @@ import { PlistServiceDecoder } from './PlistDecoder.js';
 import { PlistServiceEncoder } from './PlistEncoder.js';
 import { parsePlist } from './PlistParser.js';
 import { PlistService } from './PlistService.js';
-import { byteSwap16, sendUsbmuxPlistRequest } from './UsbmuxRequest.js';
+import { sendUsbmuxPlistRequest } from './UsbmuxRequest.js';
 
 export {
-  byteSwap16,
   createPlist,
   LengthBasedSplitter,
   parsePlist,

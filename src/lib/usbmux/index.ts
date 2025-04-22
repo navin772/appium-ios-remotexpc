@@ -1,12 +1,12 @@
 import { plist } from '@appium/support';
 import net, { Socket } from 'net';
 import os from 'os';
-import { Transform } from 'stream';
 
 import { type PairRecord, processPlistResponse } from '../PairRecord/index.js';
 import { LengthBasedSplitter } from '../Plist/index.js';
 import { UsbmuxDecoder } from './usbmux-decoder.js';
 import { UsbmuxEncoder } from './usbmux-encoder.js';
+import { BaseSocketService } from '../../BaseSocketService.js';
 
 export const USBMUXD_PORT = 27015;
 export const DEFAULT_USBMUXD_SOCKET = '/var/run/usbmuxd';
@@ -137,37 +137,9 @@ export async function getDefaultSocket(
 }
 
 /**
- * Base class for service sockets
- */
-export class BaseServiceSocket {
-  protected _socketClient: Socket;
-
-  constructor(socketClient: Socket) {
-    this._socketClient = socketClient;
-  }
-
-  /**
-   * Assigns error and close handlers to a stream
-   * @param stream - The stream to assign handlers to
-   */
-  protected _assignClientFailureHandlers(stream: Transform): void {
-    if (this._socketClient) {
-      this._socketClient.on('error', (e) => {
-        console.error(`Socket client error: ${e.message}`);
-        stream.emit('error', e);
-      });
-      this._socketClient.on('close', () => {
-        console.log('Socket client closed');
-        stream.emit('close');
-      });
-    }
-  }
-}
-
-/**
  * Usbmux class for communicating with usbmuxd
  */
-export class Usbmux extends BaseServiceSocket {
+export class Usbmux extends BaseSocketService {
   private readonly _decoder: UsbmuxDecoder;
   private readonly _splitter: LengthBasedSplitter;
   private readonly _encoder: UsbmuxEncoder;

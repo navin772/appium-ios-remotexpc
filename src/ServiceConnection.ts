@@ -52,7 +52,7 @@ export class ServiceConnection extends BasePlistService {
    */
   sendPlistRequest(
     requestObj: Record<string, any>,
-    timeout = 5000
+    timeout = 10000
   ): Promise<Record<string, any>> {
     return this.sendAndReceive(requestObj, timeout);
   }

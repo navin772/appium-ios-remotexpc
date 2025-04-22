@@ -103,11 +103,3 @@ export function sendUsbmuxPlistRequest(
     });
   });
 }
-
-/**
- * Function to swap bytes for a 16-bit value
- * Used for usbmuxd port numbers
- */
-export function byteSwap16(value: number): number {
-  return ((value & 0xff) << 8) | ((value >> 8) & 0xff);
-}
