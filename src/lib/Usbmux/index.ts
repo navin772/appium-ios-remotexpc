@@ -6,7 +6,7 @@ import { type PairRecord, processPlistResponse } from '../PairRecord/index.js';
 import { LengthBasedSplitter } from '../Plist/index.js';
 import { UsbmuxDecoder } from './usbmux-decoder.js';
 import { UsbmuxEncoder } from './usbmux-encoder.js';
-import { BaseSocketService } from '../../BaseSocketService.js';
+import { BaseSocketService } from '../../base-socket-service.js';
 
 export const USBMUXD_PORT = 27015;
 export const DEFAULT_USBMUXD_SOCKET = '/var/run/usbmuxd';
