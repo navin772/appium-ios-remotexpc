@@ -5,7 +5,6 @@ import { PlistServiceDecoder } from './PlistDecoder.js';
 import { PlistServiceEncoder } from './PlistEncoder.js';
 import { parsePlist } from './PlistParser.js';
 import { PlistService } from './PlistService.js';
-import { sendUsbmuxPlistRequest } from './UsbmuxRequest.js';
 
 export {
   createPlist,
@@ -14,5 +13,4 @@ export {
   PlistService,
   PlistServiceDecoder,
   PlistServiceEncoder,
-  sendUsbmuxPlistRequest,
 };
