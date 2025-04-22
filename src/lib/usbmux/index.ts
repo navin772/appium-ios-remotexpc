@@ -9,7 +9,6 @@ import { UsbmuxDecoder } from './usbmux-decoder.js';
 import { UsbmuxEncoder } from './usbmux-encoder.js';
 
 export const USBMUXD_PORT = 27015;
-export const LOCKDOWN_PORT = 62078;
 export const DEFAULT_USBMUXD_SOCKET = '/var/run/usbmuxd';
 export const DEFAULT_USBMUXD_HOST = '127.0.0.1';
 export const MAX_FRAME_SIZE = 1 * 1024 * 1024; // 1MB
