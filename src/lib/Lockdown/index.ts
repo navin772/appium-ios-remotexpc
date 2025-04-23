@@ -114,15 +114,13 @@ export function upgradeSocketToTLS(
 }
 
 export class LockdownService extends BasePlistService {
-  private socket: Socket | TLSSocket;
-  private udid: string;
+  private readonly udid: string;
   private _plistAfterTLS?: PlistService;
   private _isTLS = false;
   public _tlsUpgrade?: Promise<void>;
 
   constructor(socket: Socket, udid: string, autoSecure = true) {
     super(socket);
-    this.socket = socket;
     this.udid = udid;
     console.log(`LockdownService initialized for UDID: ${udid}`);
     if (autoSecure) {
@@ -178,11 +176,10 @@ export class LockdownService extends BasePlistService {
       return;
     }
     try {
-      const tlsSocket = await upgradeSocketToTLS(this.socket as Socket, {
+      const tlsSocket = await upgradeSocketToTLS(this.getSocket() as Socket, {
         cert: pairRecord.HostCertificate,
         key: pairRecord.HostPrivateKey,
       });
-      this.socket = tlsSocket;
       this._plistAfterTLS = new PlistService(tlsSocket);
       this._isTLS = true;
       console.log('Successfully upgraded connection to TLS');
@@ -192,8 +189,10 @@ export class LockdownService extends BasePlistService {
     }
   }
 
-  public getSocket() {
-    return this.socket;
+  public getSocket(): Socket | TLSSocket {
+    return this._isTLS && this._plistAfterTLS
+      ? this._plistAfterTLS.getSocket()
+      : this.getPlistService().getSocket();
   }
 
   public async sendAndReceive(msg: Record<string, unknown>, timeout = 5000) {
@@ -206,8 +205,12 @@ export class LockdownService extends BasePlistService {
   public close() {
     console.log('Closing LockdownService connections');
     try {
-      if (!this.socket.destroyed) {
-        this.socket.end();
+      // Close the TLS service if it exists
+      if (this._isTLS && this._plistAfterTLS) {
+        this._plistAfterTLS.close();
+      } else {
+        // Otherwise close the base service
+        super.close();
       }
     } catch (err) {
       console.error('Error closing socket:', err);
