@@ -1,0 +1,42 @@
+name: Test Validation
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  validate-tests:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [20.x]
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Build project including tests
+      run: npm run build
+    
+    - name: Validate test files
+      run: |
+        echo "Validating test files..."
+        # Check if test files were built successfully
+        if [ -f "build/test/tunnel-test.js" ] && [ -f "build/test/ReadPairRecord-test.js" ] && [ -f "build/test/diagnostics-test.js" ]; then
+          echo "✅ Test files built successfully"
+        else
+          echo "❌ Test files failed to build"
+          exit 1
+        fi
+        echo "Note: Actual tests are skipped in CI as they require physical iOS devices and sudo privileges"

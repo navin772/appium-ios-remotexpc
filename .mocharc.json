@@ -1,0 +1,8 @@
+{
+  "require": "tsx/cjs",
+  "node-option": ["experimental-specifier-resolution=node"],
+  "extension": ["ts"],
+  "timeout": 60000,
+  "recursive": true,
+  "reporter": "spec"
+}

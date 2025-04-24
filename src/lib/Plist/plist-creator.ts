@@ -33,7 +33,8 @@ export function createPlist(obj: Record<string, any>): string {
           return '&amp;';
         case '"':
           return '&quot;';
-        case '\'':
+        // eslint-disable-next-line quotes
+        case "'":
           return '&apos;';
         default:
           return c;

@@ -1,16 +1,16 @@
 import type { TunnelConnection } from 'tuntap-bridge';
 
-import DiagnosticsService from '../src/Services/IOS/DiagnosticService/index.js';
-import { startCoreDeviceProxy } from '../src/Services/IOS/TunnelService/index.js';
-import { createLockdownServiceByUDID } from '../src/lib/Lockdown/index.js';
-import RemoteXpcConnection from '../src/lib/RemoteXPC/remote-xpc-connection.js';
-import TunnelManager from '../src/lib/Tunnel/index.js';
+import DiagnosticsService from '../../src/Services/IOS/DiagnosticService/index.js';
+import { startCoreDeviceProxy } from '../../src/Services/IOS/TunnelService/index.js';
+import { createLockdownServiceByUDID } from '../../src/lib/Lockdown/index.js';
+import RemoteXpcConnection from '../../src/lib/RemoteXPC/remote-xpc-connection.js';
+import TunnelManager from '../../src/lib/Tunnel/index.js';
 
 async function test() {
   const tunManager = TunnelManager;
   let tunnelResult: TunnelConnection;
   console.log('create connection....');
-  const udid = '00008120-000648161480201E';
+  const udid = '';
   const { lockdownService, device } = await createLockdownServiceByUDID(udid);
   const { socket } = await startCoreDeviceProxy(
     lockdownService,
