@@ -1,3 +1,4 @@
+import { expect } from 'chai';
 import type { TunnelConnection } from 'tuntap-bridge';
 
 import SyslogService from '../../src/Services/IOS/SyslogService/index.js';
@@ -6,40 +7,63 @@ import { createLockdownServiceByUDID } from '../../src/lib/Lockdown/index.js';
 import RemoteXpcConnection from '../../src/lib/RemoteXPC/remote-xpc-connection.js';
 import TunnelManager from '../../src/lib/Tunnel/index.js';
 
-async function test() {
+describe('Tunnel and Syslog Service', function () {
+  // Increase timeout for integration tests
+  this.timeout(60000);
+
   const tunManager = TunnelManager;
   let tunnelResult: TunnelConnection;
-  console.log('create connection....');
-  const { lockdownService, device } = await createLockdownServiceByUDID();
-  const { socket } = await startCoreDeviceProxy(
-    lockdownService,
-    device.DeviceID,
-    device.Properties.SerialNumber,
-    {},
-  );
-  try {
+  let remoteXPC: RemoteXpcConnection;
+  let syslogService: SyslogService;
+  let service: any;
+
+  before(async function () {
+    console.log('Creating connection...');
+    const { lockdownService, device } = await createLockdownServiceByUDID();
+    const { socket } = await startCoreDeviceProxy(
+      lockdownService,
+      device.DeviceID,
+      device.Properties.SerialNumber,
+      {},
+    );
+
     tunnelResult = await tunManager.getTunnel(socket);
-    // console.log(tunnelResult)
 
     // Fix: Check if RsdPort is defined and provide a fallback value if it's undefined
     const rsdPort = tunnelResult.RsdPort ?? 0; // Using nullish coalescing operator
 
-    const remoteXPC = new RemoteXpcConnection([tunnelResult.Address, rsdPort]);
+    remoteXPC = new RemoteXpcConnection([tunnelResult.Address, rsdPort]);
     await remoteXPC.connect();
+
+    // Initialize syslog service
+    syslogService = new SyslogService([tunnelResult.Address, rsdPort]);
+  });
+
+  after(async function () {
+    if (tunManager) {
+      await tunManager.closeTunnel();
+    }
+  });
+
+  it('should list all services', function () {
     remoteXPC.listAllServices();
-    // console.log(remoteXPC.getServices())
-    const service = remoteXPC.findService(
-      'com.apple.os_trace_relay.shim.remote',
-    );
-    // let restart = remoteXPC.findService('com.apple.mobile.diagnostics_relay.shim.remote')
+    const services = remoteXPC.getServices();
+    expect(services).to.be.an('array');
+  });
 
-    const syslogService = new SyslogService([tunnelResult.Address, rsdPort]);
-    await syslogService.start(service, -1, tunnelResult.tunnelManager);
-    // await SyslogService.restart(restart)
-    await tunManager.closeTunnel();
-  } catch (err) {
-    console.error('Failed to establish tunnel:', err);
-  }
-}
+  it('should find os_trace_relay service', function () {
+    service = remoteXPC.findService('com.apple.os_trace_relay.shim.remote');
+    expect(service).to.not.be.undefined;
+  });
 
-test();
+  it('should start syslog service', async function () {
+    try {
+      await syslogService.start(service, -1, tunnelResult.tunnelManager);
+      // If no error is thrown, the test passes
+      expect(true).to.be.true;
+    } catch (err) {
+      console.error('Failed to start syslog service:', err);
+      throw err;
+    }
+  });
+});

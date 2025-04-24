@@ -1,3 +1,4 @@
+import { expect } from 'chai';
 import type { TunnelConnection } from 'tuntap-bridge';
 
 import DiagnosticsService from '../../src/Services/IOS/DiagnosticService/index.js';
@@ -6,29 +7,34 @@ import { createLockdownServiceByUDID } from '../../src/lib/Lockdown/index.js';
 import RemoteXpcConnection from '../../src/lib/RemoteXPC/remote-xpc-connection.js';
 import TunnelManager from '../../src/lib/Tunnel/index.js';
 
-async function test() {
+describe('Diagnostics Service', function () {
+  // Increase timeout for integration tests
+  this.timeout(60000);
+
   const tunManager = TunnelManager;
   let tunnelResult: TunnelConnection;
-  console.log('create connection....');
+  let remoteXPC: RemoteXpcConnection;
+  let diagService: DiagnosticsService;
   const udid = '';
-  const { lockdownService, device } = await createLockdownServiceByUDID(udid);
-  const { socket } = await startCoreDeviceProxy(
-    lockdownService,
-    device.DeviceID,
-    udid,
-    {},
-  );
-  try {
+
+  before(async function () {
+    console.log('Creating connection...');
+    const { lockdownService, device } = await createLockdownServiceByUDID(udid);
+    const { socket } = await startCoreDeviceProxy(
+      lockdownService,
+      device.DeviceID,
+      udid,
+      {},
+    );
+
     tunnelResult = await tunManager.getTunnel(socket);
-    // console.log(tunnelResult)
 
     // Fix: Check if RsdPort is defined and provide a fallback value if it's undefined
     const rsdPort = tunnelResult.RsdPort ?? 0; // Using nullish coalescing operator
 
-    const remoteXPC = new RemoteXpcConnection([tunnelResult.Address, rsdPort]);
+    remoteXPC = new RemoteXpcConnection([tunnelResult.Address, rsdPort]);
     await remoteXPC.connect();
     remoteXPC.listAllServices();
-    // console.log(remoteXPC.getServices())
 
     // Find the diagnostics service
     const diagnosticsService = remoteXPC.findService(
@@ -36,27 +42,38 @@ async function test() {
     );
 
     // Create diagnostics service with the address and port
-    const diagService = new DiagnosticsService([
+    diagService = new DiagnosticsService([
       tunnelResult.Address,
       parseInt(diagnosticsService.port),
     ]);
+  });
 
-    // Query some basic device information
-    console.log('Querying device information...');
+  after(async function () {
+    if (tunManager) {
+      await tunManager.closeTunnel();
+    }
+  });
+
+  it('should query power information', async function () {
+    console.log('Querying power information...');
     const powerInfo = await diagService.ioregistry({
       ioClass: 'IOPMPowerSource',
     });
-    console.log('Device Information:');
+    console.log('Power Information:');
     console.log(powerInfo);
+
+    expect(powerInfo).to.be.an('array');
+    expect(powerInfo.length).to.be.greaterThan(0);
+  });
+
+  it('should query wifi information', async function () {
+    console.log('Querying wifi information...');
     const wifiInfo = await diagService.ioregistry({
       name: 'AppleBCMWLANSkywalkInterface',
     });
-    console.log('wifiInfo Information:');
+    console.log('WiFi Information:');
     console.log(wifiInfo);
-    await tunManager.closeTunnel();
-  } catch (err) {
-    console.error('Failed to establish tunnel:', err);
-  }
-}
 
-test();
+    expect(wifiInfo).to.be.an('array');
+  });
+});

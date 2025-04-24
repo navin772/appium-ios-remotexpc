@@ -16,7 +16,7 @@
     "declarationMap": true,
     "removeComments": false,
     "lib": ["es2023"],
-    "types": ["node"],
+    "types": ["node", "mocha", "chai"],
 
     "allowSyntheticDefaultImports": true,
     "noImplicitAny": true,
