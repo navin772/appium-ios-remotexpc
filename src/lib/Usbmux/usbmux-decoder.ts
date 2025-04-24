@@ -1,5 +1,5 @@
-import { plist } from '@appium/support';
 import { Transform, type TransformCallback } from 'stream';
+import { parsePlist } from '../Plist/index.js';
 
 const HEADER_LENGTH = 16;
 
@@ -59,6 +59,6 @@ export class UsbmuxDecoder extends Transform {
     };
 
     const payload = data.slice(HEADER_LENGTH);
-    this.push({ header, payload: plist.parsePlist(payload) } as DecodedUsbmux);
+    this.push({ header, payload: parsePlist(payload) } as DecodedUsbmux);
   }
 }

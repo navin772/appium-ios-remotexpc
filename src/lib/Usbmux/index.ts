@@ -1,9 +1,8 @@
-import { plist } from '@appium/support';
 import net, { Socket } from 'net';
 import os from 'os';
 
 import { type PairRecord, processPlistResponse } from '../PairRecord/index.js';
-import { LengthBasedSplitter } from '../Plist/index.js';
+import { LengthBasedSplitter, parsePlist } from '../Plist/index.js';
 import { UsbmuxDecoder } from './usbmux-decoder.js';
 import { UsbmuxEncoder } from './usbmux-encoder.js';
 import { BaseSocketService } from '../../base-socket-service.js';
@@ -222,7 +221,7 @@ export class Usbmux extends BaseSocketService {
         try {
           // Parse the pair record
           return processPlistResponse(
-            plist.parsePlist(data.payload.PairRecordData),
+            parsePlist(data.payload.PairRecordData),
           );
         } catch (e) {
           throw new Error(`Failed to parse pair record data: ${e}`);

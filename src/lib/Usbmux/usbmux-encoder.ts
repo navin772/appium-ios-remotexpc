@@ -1,5 +1,5 @@
-import { plist } from '@appium/support';
 import { Transform, type TransformCallback } from 'stream';
+import { createPlist } from '../Plist/index.js';
 
 const HEADER_LENGTH = 16;
 const VERSION = 1;
@@ -25,7 +25,7 @@ export class UsbmuxEncoder extends Transform {
   }
 
   private _encode(data: UsbmuxEncodeData): void {
-    const plistData = plist.createPlist(data.payload, false);
+    const plistData = createPlist(data.payload, false);
     const payloadBuffer = Buffer.isBuffer(plistData)
       ? plistData
       : Buffer.from(plistData);

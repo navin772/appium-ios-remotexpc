@@ -7,6 +7,12 @@ import { DOMParser, Element, Node } from '@xmldom/xmldom';
  */
 export function parsePlist(xmlData: string | Buffer): Record<string, any> {
   const xmlStr = xmlData instanceof Buffer ? xmlData.toString('utf8') : xmlData;
+  
+  // Check if the string is empty or not XML
+  if (!xmlStr || !xmlStr.toString().trim() || !xmlStr.toString().includes('<')) {
+    throw new Error('Invalid XML: missing root element');
+  }
+  
   const parser = new DOMParser();
   const doc = parser.parseFromString(xmlStr.toString(), 'text/xml');
 
@@ -33,7 +39,15 @@ export function parsePlist(xmlData: string | Buffer): Record<string, any> {
       case 'date':
         return new Date(node.textContent || '');
       case 'data':
-        return node.textContent; // Might need base64 handling for binary data
+        // Convert base64 to Buffer for binary data
+        if (node.textContent) {
+          try {
+            return Buffer.from(node.textContent, 'base64');
+          } catch (e) {
+            return node.textContent;
+          }
+        }
+        return null;
       default:
         return node.textContent || null;
     }
