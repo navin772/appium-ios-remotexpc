@@ -1,5 +1,6 @@
 import { Socket } from 'net';
 
+import { type XPCDictionary } from '../types.js';
 import { Http2Constants, XpcConstants } from './constants.js';
 import {
   DataFrame,
@@ -31,7 +32,7 @@ class Handshake {
     });
   }
 
-  async sendRequest(data: object): Promise<void> {
+  async sendRequest(data: XPCDictionary): Promise<void> {
     const flags: number = XpcConstants.XPC_FLAGS_ALWAYS_SET;
     const requestMessage: XPCMessage = {
       flags: flags,

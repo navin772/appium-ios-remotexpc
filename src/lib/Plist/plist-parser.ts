@@ -1,24 +1,30 @@
 import { DOMParser, Element, Node } from '@xmldom/xmldom';
 
+import type { PlistArray, PlistDictionary, PlistValue } from '../types.js';
+
 /**
  * Parses an XML plist string into a JavaScript object
  * @param xmlData - XML plist data as string or Buffer
  * @returns - Parsed JavaScript object
  */
-export function parsePlist(xmlData: string | Buffer): Record<string, any> {
+export function parsePlist(xmlData: string | Buffer): PlistDictionary {
   const xmlStr = xmlData instanceof Buffer ? xmlData.toString('utf8') : xmlData;
-  
+
   // Check if the string is empty or not XML
-  if (!xmlStr || !xmlStr.toString().trim() || !xmlStr.toString().includes('<')) {
+  if (
+    !xmlStr ||
+    !xmlStr.toString().trim() ||
+    !xmlStr.toString().includes('<')
+  ) {
     throw new Error('Invalid XML: missing root element');
   }
-  
+
   const parser = new DOMParser();
   const doc = parser.parseFromString(xmlStr.toString(), 'text/xml');
 
   if (!doc) throw new Error('Invalid XML response');
 
-  function parseNode(node: Element): any {
+  function parseNode(node: Element): PlistValue {
     if (!node) return null;
 
     switch (node.nodeName) {
@@ -43,6 +49,7 @@ export function parsePlist(xmlData: string | Buffer): Record<string, any> {
         if (node.textContent) {
           try {
             return Buffer.from(node.textContent, 'base64');
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
           } catch (e) {
             return node.textContent;
           }
@@ -53,8 +60,8 @@ export function parsePlist(xmlData: string | Buffer): Record<string, any> {
     }
   }
 
-  function parseDict(dictNode: Element): Record<string, any> {
-    const obj: Record<string, any> = {};
+  function parseDict(dictNode: Element): PlistDictionary {
+    const obj: PlistDictionary = {};
     const keys = dictNode.getElementsByTagName('key');
 
     for (let i = 0; i < keys.length; i++) {
@@ -74,8 +81,8 @@ export function parsePlist(xmlData: string | Buffer): Record<string, any> {
     return obj;
   }
 
-  function parseArray(arrayNode: Element): any[] {
-    const result: any[] = [];
+  function parseArray(arrayNode: Element): PlistArray {
+    const result: PlistArray = [];
     let childNode = arrayNode.firstChild;
 
     while (childNode) {

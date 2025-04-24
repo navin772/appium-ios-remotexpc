@@ -1,17 +1,17 @@
 import { Socket } from 'node:net';
 
 import { PlistService } from './lib/Plist/plist-service.js';
+import type { PlistDictionary } from './lib/types.js';
 
 /**
  * Message type for plist communications
  */
-type PlistMessage = Record<string, unknown>;
+type PlistMessage = PlistDictionary;
 
 /**
  * Base class for services that use PlistService for communication
  */
 export abstract class BasePlistService {
-
   /**
    * Sends a message and waits for a response
    * @param message The message to send

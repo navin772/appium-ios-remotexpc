@@ -1,12 +1,14 @@
 import { Transform, type TransformCallback } from 'stream';
+
 import { createPlist } from '../Plist/index.js';
+import type { PlistDictionary } from '../types.js';
 
 const HEADER_LENGTH = 16;
 const VERSION = 1;
 const TYPE = 8;
 
 export interface UsbmuxEncodeData {
-  payload: any; // You can refine this type if you know the exact shape of your payload.
+  payload: PlistDictionary; // Using PlistDictionary for the payload
   tag: number;
 }
 

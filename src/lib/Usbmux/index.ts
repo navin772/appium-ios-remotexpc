@@ -1,11 +1,13 @@
 import net, { Socket } from 'net';
 import os from 'os';
 
-import { type PairRecord, processPlistResponse } from '../PairRecord/index.js';
-import { LengthBasedSplitter, parsePlist } from '../Plist/index.js';
-import { UsbmuxDecoder } from './usbmux-decoder.js';
-import { UsbmuxEncoder } from './usbmux-encoder.js';
 import { BaseSocketService } from '../../base-socket-service.js';
+import { type PairRecord, processPlistResponse } from '../PairRecord/index.js';
+import { type RawPairRecordResponse } from '../PairRecord/pair-record.js';
+import { LengthBasedSplitter, parsePlist } from '../Plist/index.js';
+import type { PlistDictionary } from '../types.js';
+import { type DecodedUsbmux, UsbmuxDecoder } from './usbmux-decoder.js';
+import { UsbmuxEncoder } from './usbmux-encoder.js';
 
 export const USBMUXD_PORT = 27015;
 export const DEFAULT_USBMUXD_SOCKET = '/var/run/usbmuxd';
@@ -143,7 +145,10 @@ export class Usbmux extends BaseSocketService {
   private readonly _splitter: LengthBasedSplitter;
   private readonly _encoder: UsbmuxEncoder;
   private _tag: number;
-  private readonly _responseCallbacks: Record<number, (data: any) => void>;
+  private readonly _responseCallbacks: Record<
+    number,
+    (data: DecodedUsbmux) => void
+  >;
 
   /**
    * Creates a new Usbmux instance
@@ -179,11 +184,11 @@ export class Usbmux extends BaseSocketService {
    * @returns Promise that resolves with the BUID
    */
   async readBUID(timeout = 5000): Promise<string> {
-    const { tag, receivePromise } = this._receivePlistPromise(
+    const { tag, receivePromise } = this._receivePlistPromise<string>(
       timeout,
       (data) => {
         if (data.payload.BUID) {
-          return data.payload.BUID;
+          return data.payload.BUID as string;
         }
         throw new Error(`Unexpected data: ${JSON.stringify(data)}`);
       },
@@ -212,22 +217,22 @@ export class Usbmux extends BaseSocketService {
     timeout = 5000,
   ): Promise<PairRecord | null> {
     // Request from usbmuxd if not found in cache
-    const { tag, receivePromise } = this._receivePlistPromise(
-      timeout,
-      (data) => {
+    const { tag, receivePromise } =
+      this._receivePlistPromise<PairRecord | null>(timeout, (data) => {
         if (!data.payload.PairRecordData) {
           return null;
         }
         try {
-          // Parse the pair record
+          // Parse the pair record and assert the type
           return processPlistResponse(
-            parsePlist(data.payload.PairRecordData),
+            parsePlist(
+              data.payload.PairRecordData as Buffer,
+            ) as unknown as RawPairRecordResponse,
           );
         } catch (e) {
           throw new Error(`Failed to parse pair record data: ${e}`);
         }
-      },
-    );
+      });
 
     this._sendPlist({
       tag,
@@ -248,11 +253,11 @@ export class Usbmux extends BaseSocketService {
    * @returns Promise that resolves with the device list
    */
   async listDevices(timeout = 5000): Promise<any[]> {
-    const { tag, receivePromise } = this._receivePlistPromise(
+    const { tag, receivePromise } = this._receivePlistPromise<any[]>(
       timeout,
       (data) => {
         if (data.payload.DeviceList) {
-          return data.payload.DeviceList;
+          return data.payload.DeviceList as any[];
         }
         throw new Error(`Unexpected data: ${JSON.stringify(data)}`);
       },
@@ -293,7 +298,7 @@ export class Usbmux extends BaseSocketService {
     port: number,
     timeout = 5000,
   ): Promise<Socket> {
-    const { tag, receivePromise } = this._receivePlistPromise(
+    const { tag, receivePromise } = this._receivePlistPromise<Socket>(
       timeout,
       (data) => {
         if (data.payload.MessageType !== 'Result') {
@@ -355,7 +360,7 @@ export class Usbmux extends BaseSocketService {
    * @param data - Decoded data
    * @private
    */
-  private _handleData(data: any): void {
+  private _handleData(data: DecodedUsbmux): void {
     const cb = this._responseCallbacks[data.header.tag];
     if (cb) {
       cb(data);
@@ -367,10 +372,7 @@ export class Usbmux extends BaseSocketService {
    * @param json - JSON object with tag and payload
    * @private
    */
-  private _sendPlist(json: {
-    tag: number;
-    payload: Record<string, any>;
-  }): void {
+  private _sendPlist(json: { tag: number; payload: PlistDictionary }): void {
     this._encoder.write(json);
   }
 
@@ -381,13 +383,13 @@ export class Usbmux extends BaseSocketService {
    * @returns Object with tag and promise
    * @private
    */
-  private _receivePlistPromise(
+  private _receivePlistPromise<T>(
     timeout = 5000,
-    responseCallback: (data: any) => any,
-  ): { tag: number; receivePromise: Promise<any> } {
+    responseCallback: (data: DecodedUsbmux) => T,
+  ): { tag: number; receivePromise: Promise<T> } {
     const tag = this._tag++;
     let timeoutId: NodeJS.Timeout;
-    const receivePromise = new Promise<any>((resolve, reject) => {
+    const receivePromise = new Promise<T>((resolve, reject) => {
       this._responseCallbacks[tag] = (data) => {
         try {
           // Clear the timeout to prevent it from triggering

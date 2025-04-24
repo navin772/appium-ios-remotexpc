@@ -1,10 +1,12 @@
+import type { PlistDictionary, PlistValue } from '../types.js';
+
 /**
  * Creates an XML plist string from a JavaScript object
  * @param obj - The JavaScript object to convert
  * @returns - XML plist string
  */
-export function createPlist(obj: Record<string, any>): string {
-  function convert(value: any): string {
+export function createPlist(obj: PlistDictionary): string {
+  function convert(value: PlistValue): string {
     if (typeof value === 'number') return `<integer>${value}</integer>`;
     if (typeof value === 'boolean') return value ? '<true/>' : '<false/>';
     if (typeof value === 'string')
@@ -33,7 +35,7 @@ export function createPlist(obj: Record<string, any>): string {
           return '&amp;';
         case '"':
           return '&quot;';
-        case '\'':
+        case "'":
           return '&apos;';
         default:
           return c;

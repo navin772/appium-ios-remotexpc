@@ -1,5 +1,6 @@
-import { createPlist as createXmlPlist } from './plist-creator.js';
+import type { PlistDictionary } from '../types.js';
 import { createBinaryPlist } from './binary-plist-creator.js';
+import { createPlist as createXmlPlist } from './plist-creator.js';
 
 /**
  * Unified plist creator that can create both XML and binary plists
@@ -7,11 +8,13 @@ import { createBinaryPlist } from './binary-plist-creator.js';
  * @param binary - Whether to create a binary plist (true) or XML plist (false)
  * @returns The plist data as a string (XML) or Buffer (binary)
  */
-export function createPlist(obj: Record<string, any>, binary: boolean = false): string | Buffer {
+export function createPlist(
+  obj: PlistDictionary,
+  binary: boolean = false,
+): string | Buffer {
   if (binary) {
     return createBinaryPlist(obj);
   } else {
     return createXmlPlist(obj);
   }
 }
-

@@ -1,21 +1,24 @@
 /**
  * Binary Property List (bplist) Creator
- * 
+ *
  * This module provides functionality to create binary property lists (bplists)
  * commonly used in Apple's iOS and macOS systems.
  */
+import type { PlistDictionary, PlistValue } from '../types.js';
 
 // Constants for binary plist format
 const BPLIST_MAGIC = 'bplist';
 const BPLIST_VERSION = '00';
-const BPLIST_MAGIC_AND_VERSION = Buffer.from(`${BPLIST_MAGIC}${BPLIST_VERSION}`);
+const BPLIST_MAGIC_AND_VERSION = Buffer.from(
+  `${BPLIST_MAGIC}${BPLIST_VERSION}`,
+);
 
 // Object types in binary plist
 const BPLIST_TYPE = {
   NULL: 0x00,
   FALSE: 0x08,
   TRUE: 0x09,
-  FILL: 0x0F,
+  FILL: 0x0f,
   INT: 0x10,
   REAL: 0x20,
   DATE: 0x30,
@@ -23,9 +26,9 @@ const BPLIST_TYPE = {
   STRING_ASCII: 0x50,
   STRING_UNICODE: 0x60,
   UID: 0x80,
-  ARRAY: 0xA0,
-  SET: 0xC0,
-  DICT: 0xD0
+  ARRAY: 0xa0,
+  SET: 0xc0,
+  DICT: 0xd0,
 };
 
 /**
@@ -33,61 +36,73 @@ const BPLIST_TYPE = {
  * @param obj - The JavaScript object to convert to a binary plist
  * @returns Buffer containing the binary plist data
  */
-export function createBinaryPlist(obj: any): Buffer {
+export function createBinaryPlist(obj: PlistValue): Buffer {
   // Collect all objects and assign IDs
-  const objectTable: any[] = [];
-  const objectRefMap = new Map<any, number>();
-  
+  const objectTable: PlistValue[] = [];
+  const objectRefMap = new Map<PlistValue, number>();
+
   // Collect all unique objects
-  function collectObjects(value: any): void {
+  function collectObjects(value: PlistValue): void {
     // Skip if already in the table
     if (objectRefMap.has(value)) {
       return;
     }
-    
+
     // Add to the table and map
     const id = objectTable.length;
     objectTable.push(value);
     objectRefMap.set(value, id);
-    
+
     // Recursively collect objects for arrays and dictionaries
     if (Array.isArray(value)) {
       for (const item of value) {
         collectObjects(item);
       }
-    } else if (value !== null && typeof value === 'object' && !(value instanceof Date) && !(value instanceof Buffer)) {
-      for (const key of Object.keys(value)) {
+    } else if (
+      value !== null &&
+      typeof value === 'object' &&
+      !(value instanceof Date) &&
+      !(value instanceof Buffer)
+    ) {
+      // This is a dictionary
+      const dict = value as PlistDictionary;
+      for (const key of Object.keys(dict)) {
         collectObjects(key);
-        collectObjects(value[key]);
+        collectObjects(dict[key]);
       }
     }
   }
-  
+
   collectObjects(obj);
-  
+
   // Calculate sizes
   const numObjects = objectTable.length;
   const objectRefSize = calculateMinByteSize(numObjects - 1);
-  
+
   // Create object data
   const objectOffsets: number[] = [];
   const objectData: Buffer[] = [];
-  
+
   for (const value of objectTable) {
     objectOffsets.push(calculateObjectDataLength(objectData));
     objectData.push(createObjectData(value, objectRefMap, objectRefSize));
   }
-  
+
   // Calculate offset table size
   const maxOffset = calculateObjectDataLength(objectData);
   const offsetSize = calculateMinByteSize(maxOffset);
-  
+
   // Create offset table
   const offsetTable = Buffer.alloc(numObjects * offsetSize);
   for (let i = 0; i < numObjects; i++) {
-    writeOffsetToBuffer(offsetTable, i * offsetSize, objectOffsets[i], offsetSize);
+    writeOffsetToBuffer(
+      offsetTable,
+      i * offsetSize,
+      objectOffsets[i],
+      offsetSize,
+    );
   }
-  
+
   // Create trailer
   const trailer = Buffer.alloc(32);
   // 6 unused bytes
@@ -101,15 +116,16 @@ export function createBinaryPlist(obj: any): Buffer {
   // top object ID (8 bytes)
   writeBigIntToBuffer(trailer, 16, BigInt(0)); // Root object is always the first one
   // offset table offset (8 bytes)
-  const offsetTableOffset = BPLIST_MAGIC_AND_VERSION.length + calculateObjectDataLength(objectData);
+  const offsetTableOffset =
+    BPLIST_MAGIC_AND_VERSION.length + calculateObjectDataLength(objectData);
   writeBigIntToBuffer(trailer, 24, BigInt(offsetTableOffset));
-  
+
   // Combine all parts
   return Buffer.concat([
     BPLIST_MAGIC_AND_VERSION,
     ...objectData,
     offsetTable,
-    trailer
+    trailer,
   ]);
 }
 
@@ -146,7 +162,12 @@ function calculateObjectDataLength(buffers: Buffer[]): number {
  * @param value - Value to write
  * @param size - Number of bytes to use
  */
-function writeOffsetToBuffer(buffer: Buffer, position: number, value: number, size: number): void {
+function writeOffsetToBuffer(
+  buffer: Buffer,
+  position: number,
+  value: number,
+  size: number,
+): void {
   if (size === 1) {
     buffer.writeUInt8(value, position);
   } else if (size === 2) {
@@ -164,7 +185,11 @@ function writeOffsetToBuffer(buffer: Buffer, position: number, value: number, si
  * @param position - Position in the buffer
  * @param value - BigInt value to write
  */
-function writeBigIntToBuffer(buffer: Buffer, position: number, value: bigint): void {
+function writeBigIntToBuffer(
+  buffer: Buffer,
+  position: number,
+  value: bigint,
+): void {
   buffer.writeBigUInt64BE(value, position);
 }
 
@@ -175,7 +200,11 @@ function writeBigIntToBuffer(buffer: Buffer, position: number, value: bigint): v
  * @param objectRefSize - Size of object references in bytes
  * @returns Buffer containing the binary data
  */
-function createObjectData(value: any, objectRefMap: Map<any, number>, objectRefSize: number): Buffer {
+function createObjectData(
+  value: PlistValue,
+  objectRefMap: Map<PlistValue, number>,
+  objectRefSize: number,
+): Buffer {
   // Handle null and booleans
   if (value === null) {
     return Buffer.from([BPLIST_TYPE.NULL]);
@@ -184,7 +213,7 @@ function createObjectData(value: any, objectRefMap: Map<any, number>, objectRefS
   } else if (value === true) {
     return Buffer.from([BPLIST_TYPE.TRUE]);
   }
-  
+
   // Handle numbers
   if (typeof value === 'number') {
     // Check if it's an integer
@@ -225,7 +254,7 @@ function createObjectData(value: any, objectRefMap: Map<any, number>, objectRefS
       return buffer;
     }
   }
-  
+
   // Handle Date
   if (value instanceof Date) {
     const buffer = Buffer.alloc(9);
@@ -236,110 +265,129 @@ function createObjectData(value: any, objectRefMap: Map<any, number>, objectRefS
     buffer.writeDoubleBE(timestamp, 1);
     return buffer;
   }
-  
+
   // Handle Buffer (DATA)
   if (Buffer.isBuffer(value)) {
     const length = value.length;
     let header: Buffer;
-    
+
     if (length < 15) {
       header = Buffer.from([BPLIST_TYPE.DATA | length]);
     } else {
       // For longer data, we need to encode the length separately
       const lengthBuffer = createIntHeader(length);
       header = Buffer.concat([
-        Buffer.from([BPLIST_TYPE.DATA | 0x0F]), // 0x0F indicates length follows
-        lengthBuffer
+        Buffer.from([BPLIST_TYPE.DATA | 0x0f]), // 0x0F indicates length follows
+        lengthBuffer,
       ]);
     }
-    
+
     return Buffer.concat([header, value]);
   }
-  
+
   // Handle strings
   if (typeof value === 'string') {
     // Check if string can be ASCII
+    // eslint-disable-next-line no-control-regex
     const isAscii = /^[\x00-\x7F]*$/.test(value);
-    const stringBuffer = isAscii 
+    const stringBuffer = isAscii
       ? Buffer.from(value, 'ascii')
       : Buffer.from(value, 'utf16le');
-    
+
     const length = isAscii ? value.length : value.length;
     let header: Buffer;
-    
+
     if (length < 15) {
-      header = Buffer.from([isAscii ? (BPLIST_TYPE.STRING_ASCII | length) : (BPLIST_TYPE.STRING_UNICODE | length)]);
+      header = Buffer.from([
+        isAscii
+          ? BPLIST_TYPE.STRING_ASCII | length
+          : BPLIST_TYPE.STRING_UNICODE | length,
+      ]);
     } else {
       // For longer strings, we need to encode the length separately
       const lengthBuffer = createIntHeader(length);
       header = Buffer.concat([
-        Buffer.from([isAscii ? (BPLIST_TYPE.STRING_ASCII | 0x0F) : (BPLIST_TYPE.STRING_UNICODE | 0x0F)]),
-        lengthBuffer
+        Buffer.from([
+          isAscii
+            ? BPLIST_TYPE.STRING_ASCII | 0x0f
+            : BPLIST_TYPE.STRING_UNICODE | 0x0f,
+        ]),
+        lengthBuffer,
       ]);
     }
-    
+
     return Buffer.concat([header, stringBuffer]);
   }
-  
+
   // Handle arrays
   if (Array.isArray(value)) {
     const length = value.length;
     let header: Buffer;
-    
+
     if (length < 15) {
       header = Buffer.from([BPLIST_TYPE.ARRAY | length]);
     } else {
       // For longer arrays, we need to encode the length separately
       const lengthBuffer = createIntHeader(length);
       header = Buffer.concat([
-        Buffer.from([BPLIST_TYPE.ARRAY | 0x0F]), // 0x0F indicates length follows
-        lengthBuffer
+        Buffer.from([BPLIST_TYPE.ARRAY | 0x0f]), // 0x0F indicates length follows
+        lengthBuffer,
       ]);
     }
-    
+
     // Create references to each item
     const refBuffer = Buffer.alloc(length * objectRefSize);
     for (let i = 0; i < length; i++) {
       const itemRef = objectRefMap.get(value[i]) ?? 0;
       writeOffsetToBuffer(refBuffer, i * objectRefSize, itemRef, objectRefSize);
     }
-    
+
     return Buffer.concat([header, refBuffer]);
   }
-  
+
   // Handle objects (dictionaries)
   if (typeof value === 'object') {
     const keys = Object.keys(value);
     const length = keys.length;
     let header: Buffer;
-    
+
     if (length < 15) {
       header = Buffer.from([BPLIST_TYPE.DICT | length]);
     } else {
       // For larger dictionaries, we need to encode the length separately
       const lengthBuffer = createIntHeader(length);
       header = Buffer.concat([
-        Buffer.from([BPLIST_TYPE.DICT | 0x0F]), // 0x0F indicates length follows
-        lengthBuffer
+        Buffer.from([BPLIST_TYPE.DICT | 0x0f]), // 0x0F indicates length follows
+        lengthBuffer,
       ]);
     }
-    
+
     // Create references to keys and values
     const keyRefBuffer = Buffer.alloc(length * objectRefSize);
     const valueRefBuffer = Buffer.alloc(length * objectRefSize);
-    
+
     for (let i = 0; i < length; i++) {
       const key = keys[i];
       const keyRef = objectRefMap.get(key) ?? 0;
       const valueRef = objectRefMap.get(value[key]) ?? 0;
-      
-      writeOffsetToBuffer(keyRefBuffer, i * objectRefSize, keyRef, objectRefSize);
-      writeOffsetToBuffer(valueRefBuffer, i * objectRefSize, valueRef, objectRefSize);
+
+      writeOffsetToBuffer(
+        keyRefBuffer,
+        i * objectRefSize,
+        keyRef,
+        objectRefSize,
+      );
+      writeOffsetToBuffer(
+        valueRefBuffer,
+        i * objectRefSize,
+        valueRef,
+        objectRefSize,
+      );
     }
-    
+
     return Buffer.concat([header, keyRefBuffer, valueRefBuffer]);
   }
-  
+
   // Default fallback
   return Buffer.from([BPLIST_TYPE.NULL]);
 }

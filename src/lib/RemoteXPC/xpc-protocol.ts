@@ -1,3 +1,5 @@
+import type { XPCArray, XPCDictionary, XPCValue } from '../types.js';
+
 // Constants for XPC protocol.
 const BODY_VERSION: number = 0x00000005;
 const WRAPPER_MAGIC: number = 0x29b00b92;
@@ -125,7 +127,7 @@ class Reader {
 export interface XPCMessage {
   flags: number;
   id?: bigint | number;
-  body?: Record<string, any> | null;
+  body?: XPCDictionary | null;
   size?: number;
 }
 
@@ -198,14 +200,24 @@ export function decodeMessage(buffer: Buffer): XPCMessage {
   // The remaining body is (bodyLen - 8) bytes.
   const bodyPayloadLength = Number(bodyLen) - 8;
   const bodyBuffer = reader.readBytes(bodyPayloadLength);
-  const body = decodeObject(new Reader(bodyBuffer));
-  return { flags, id: msgId, body };
+  const decodedValue = decodeObject(new Reader(bodyBuffer));
+
+  // Ensure the decoded value is a dictionary
+  if (
+    typeof decodedValue !== 'object' ||
+    decodedValue === null ||
+    Array.isArray(decodedValue)
+  ) {
+    throw new Error('Expected dictionary as message body');
+  }
+
+  return { flags, id: msgId, body: decodedValue as XPCDictionary };
 }
 
 /**
  * Encodes a JavaScript object (dictionary) into XPC format.
  */
-function encodeDictionary(writer: Writer, dict: Record<string, any>): void {
+function encodeDictionary(writer: Writer, dict: XPCDictionary): void {
   const inner = new Writer();
   const keys = Object.keys(dict);
   // Write the number of dictionary entries (uint32).
@@ -238,7 +250,7 @@ function encodeDictionaryKey(writer: Writer, key: string): void {
  * Encodes a JavaScript value into XPC format.
  * Supports: null, booleans, numbers (as int64 or double), strings, Date, Buffer/Uint8Array, arrays, and objects.
  */
-function encodeObject(writer: Writer, value: any): void {
+function encodeObject(writer: Writer, value: XPCValue): void {
   if (value === null || value === undefined) {
     writer.writeUInt32LE(XPC_TYPES.null);
     return;
@@ -308,7 +320,7 @@ function encodeObject(writer: Writer, value: any): void {
 /**
  * Decodes an XPC object from the provided reader.
  */
-function decodeObject(reader: Reader): any {
+function decodeObject(reader: Reader): XPCValue {
   const type = reader.readUInt32LE();
   switch (type) {
     case XPC_TYPES.null:
@@ -352,7 +364,7 @@ function decodeObject(reader: Reader): any {
     }
     case XPC_TYPES.array: {
       const numElements = reader.readUInt32LE();
-      const arr: any[] = [];
+      const arr: XPCArray = [];
       for (let i = 0; i < numElements; i++) {
         arr.push(decodeObject(reader));
       }
@@ -369,9 +381,9 @@ function decodeObject(reader: Reader): any {
 /**
  * Decodes a dictionary from the reader.
  */
-function decodeDictionary(reader: Reader): Record<string, any> {
+function decodeDictionary(reader: Reader): XPCDictionary {
   const numEntries = reader.readUInt32LE();
-  const dict: Record<string, any> = {};
+  const dict: XPCDictionary = {};
   for (let i = 0; i < numEntries; i++) {
     const key = readDictionaryKey(reader);
     dict[key] = decodeObject(reader);

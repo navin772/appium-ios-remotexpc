@@ -4,6 +4,7 @@ import tls, { type ConnectionOptions, TLSSocket } from 'tls';
 import { BasePlistService } from '../../base-plist-service.js';
 import { type PairRecord } from '../PairRecord/index.js';
 import { PlistService } from '../Plist/plist-service.js';
+import type { PlistValue } from '../types.js';
 
 const { createUsbmux, connectAndRelay } = await import('../Usbmux/index.js');
 const LABEL = 'appium-internal';
@@ -195,7 +196,7 @@ export class LockdownService extends BasePlistService {
       : this.getPlistService().getSocket();
   }
 
-  public async sendAndReceive(msg: Record<string, unknown>, timeout = 5000) {
+  public async sendAndReceive(msg: Record<string, PlistValue>, timeout = 5000) {
     if (this._isTLS && this._plistAfterTLS) {
       return this._plistAfterTLS.sendPlistAndReceive(msg, timeout);
     }

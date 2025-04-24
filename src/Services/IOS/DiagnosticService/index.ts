@@ -1,3 +1,4 @@
+import type { PlistDictionary } from '../../../lib/types.js';
 import ServiceConnection from '../../../service-connection.js';
 // Import MobileGestaltKeys directly to avoid module resolution issues
 import { MobileGestaltKeys } from './keys.js';
@@ -31,7 +32,7 @@ class DiagnosticsService {
    * @param keys Array of keys to query, if not provided all keys will be queried
    * @returns Object containing the queried keys and their values
    */
-  async mobileGestalt(keys: string[] = []): Promise<Record<string, any>> {
+  async mobileGestalt(keys: string[] = []): Promise<PlistDictionary> {
     try {
       // If no keys provided, use all available keys
       if (!keys || keys.length === 0) {
@@ -48,7 +49,7 @@ class DiagnosticsService {
       const conn = await this.startLockdownService(service);
 
       // Create the request
-      const request = {
+      const request: PlistDictionary = {
         Request: 'MobileGestalt',
         MobileGestaltKeys: keys,
       };
@@ -94,7 +95,7 @@ class DiagnosticsService {
    * Restart the device
    * @returns Promise that resolves when the restart request is sent
    */
-  async restart(): Promise<Record<string, any>> {
+  async restart(): Promise<PlistDictionary> {
     try {
       // Create a connection to the diagnostics service
       const service = {
@@ -106,7 +107,7 @@ class DiagnosticsService {
       const conn = await this.startLockdownService(service);
 
       // Create the request
-      const request = {
+      const request: PlistDictionary = {
         Request: 'Restart',
       };
 
@@ -130,7 +131,7 @@ class DiagnosticsService {
    * Shutdown the device
    * @returns Promise that resolves when the shutdown request is sent
    */
-  async shutdown(): Promise<Record<string, any>> {
+  async shutdown(): Promise<PlistDictionary> {
     try {
       // Create a connection to the diagnostics service
       const service = {
@@ -142,7 +143,7 @@ class DiagnosticsService {
       const conn = await this.startLockdownService(service);
 
       // Create the request
-      const request = {
+      const request: PlistDictionary = {
         Request: 'Shutdown',
       };
 
@@ -166,7 +167,7 @@ class DiagnosticsService {
    * Put the device in sleep mode
    * @returns Promise that resolves when the sleep request is sent
    */
-  async sleep(): Promise<Record<string, any>> {
+  async sleep(): Promise<PlistDictionary> {
     try {
       // Create a connection to the diagnostics service
       const service = {
@@ -178,7 +179,7 @@ class DiagnosticsService {
       const conn = await this.startLockdownService(service);
 
       // Create the request
-      const request = {
+      const request: PlistDictionary = {
         Request: 'Sleep',
       };
 
@@ -207,7 +208,7 @@ class DiagnosticsService {
     plane?: string;
     name?: string;
     ioClass?: string;
-  }): Promise<Record<string, any>> {
+  }): Promise<PlistDictionary> {
     try {
       // Create a connection to the diagnostics service
       const service = {
@@ -219,7 +220,7 @@ class DiagnosticsService {
       const conn = await this.startLockdownService(service);
 
       // Create the request
-      const request: Record<string, any> = {
+      const request: PlistDictionary = {
         Request: 'IORegistry',
       };
 

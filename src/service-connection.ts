@@ -1,5 +1,7 @@
 import net from 'node:net';
+
 import { BasePlistService } from './base-plist-service.js';
+import type { PlistDictionary } from './lib/types.js';
 
 export interface ServiceConnectionOptions {
   keepAlive?: boolean;
@@ -48,9 +50,9 @@ export class ServiceConnection extends BasePlistService {
    * Sends a plist request to the device and returns the response
    */
   sendPlistRequest(
-    requestObj: Record<string, any>,
-    timeout = 10000
-  ): Promise<Record<string, any>> {
+    requestObj: PlistDictionary,
+    timeout = 10000,
+  ): Promise<PlistDictionary> {
     return this.sendAndReceive(requestObj, timeout);
   }
 

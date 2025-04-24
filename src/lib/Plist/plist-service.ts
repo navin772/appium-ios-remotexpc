@@ -1,6 +1,7 @@
 import { Socket } from 'net';
 import { TLSSocket } from 'tls';
 
+import type { PlistDictionary } from '../types.js';
 import LengthBasedSplitter from './length-based-splitter.js';
 import PlistServiceDecoder from './plist-decoder.js';
 import PlistServiceEncoder from './plist-encoder.js';
@@ -8,7 +9,7 @@ import PlistServiceEncoder from './plist-encoder.js';
 /**
  * Message type for plist communications
  */
-type PlistMessage = Record<string, unknown>;
+type PlistMessage = PlistDictionary;
 
 /**
  * Service for communication using plist protocol

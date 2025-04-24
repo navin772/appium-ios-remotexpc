@@ -1,5 +1,7 @@
 import { Transform, type TransformCallback } from 'stream';
+
 import { parsePlist } from '../Plist/index.js';
+import type { PlistDictionary } from '../types.js';
 
 const HEADER_LENGTH = 16;
 
@@ -12,7 +14,7 @@ export interface UsbmuxHeader {
 
 export interface DecodedUsbmux {
   header: UsbmuxHeader;
-  payload: any;
+  payload: PlistDictionary;
 }
 
 export class UsbmuxDecoder extends Transform {
