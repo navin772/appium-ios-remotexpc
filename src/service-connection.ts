@@ -1,19 +1,21 @@
 import net from 'node:net';
 
 import { BasePlistService } from './base-plist-service.js';
+import type { PlistServiceOptions } from './lib/Plist/plist-service.js';
 import type { PlistDictionary } from './lib/types.js';
 
 export interface ServiceConnectionOptions {
   keepAlive?: boolean;
   createConnectionTimeout?: number;
+  plistOptions?: PlistServiceOptions;
 }
 
 /**
  * ServiceConnection for communicating with Apple device services over TCP
  */
 export class ServiceConnection extends BasePlistService {
-  constructor(socket: net.Socket) {
-    super(socket);
+  constructor(socket: net.Socket, options?: ServiceConnectionOptions) {
+    super(socket, options?.plistOptions);
   }
 
   /**
@@ -33,7 +35,7 @@ export class ServiceConnection extends BasePlistService {
         () => {
           socket.setTimeout(0);
           if (keepAlive) socket.setKeepAlive(true);
-          resolve(new ServiceConnection(socket));
+          resolve(new ServiceConnection(socket, options));
         },
       );
 

@@ -145,7 +145,11 @@ class SyslogService {
   ): Promise<ServiceConnection> {
     // Get the port for the requested service
     const port = service.port;
-    return ServiceConnection.createUsingTCP(this.address[0], port);
+    return ServiceConnection.createUsingTCP(this.address[0], port, {
+      plistOptions: {
+        maxFrameLength: 5 * 1024 * 1024, // 5MB buffer for syslog data
+      },
+    });
   }
 
   /**

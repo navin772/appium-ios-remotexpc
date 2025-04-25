@@ -1,6 +1,9 @@
 import { Socket } from 'node:net';
 
-import { PlistService } from './lib/Plist/plist-service.js';
+import {
+  PlistService,
+  type PlistServiceOptions,
+} from './lib/Plist/plist-service.js';
 import type { PlistDictionary } from './lib/types.js';
 
 /**
@@ -46,13 +49,17 @@ export abstract class BasePlistService {
 
   /**
    * Creates a new BasePlistService
-   * @param plistServiceOrSocket
+   * @param plistServiceOrSocket PlistService instance or Socket
+   * @param options Configuration options for PlistService
    */
-  protected constructor(plistServiceOrSocket: PlistService | Socket) {
+  protected constructor(
+    plistServiceOrSocket: PlistService | Socket,
+    options: PlistServiceOptions = {},
+  ) {
     if (plistServiceOrSocket instanceof PlistService) {
       this._plistService = plistServiceOrSocket;
     } else {
-      this._plistService = new PlistService(plistServiceOrSocket);
+      this._plistService = new PlistService(plistServiceOrSocket, options);
     }
   }
 

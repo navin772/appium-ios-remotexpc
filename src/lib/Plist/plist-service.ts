@@ -12,6 +12,13 @@ import PlistServiceEncoder from './plist-encoder.js';
 type PlistMessage = PlistDictionary;
 
 /**
+ * Options for PlistService
+ */
+export interface PlistServiceOptions {
+  maxFrameLength?: number;
+}
+
+/**
  * Service for communication using plist protocol
  */
 export class PlistService {
@@ -31,12 +38,15 @@ export class PlistService {
   /**
    * Creates a new PlistService instance
    * @param socket The socket to use for communication
+   * @param options Configuration options
    */
-  constructor(socket: Socket) {
+  constructor(socket: Socket, options: PlistServiceOptions = {}) {
     this.socket = socket;
 
     // Set up transformers
-    this.splitter = new LengthBasedSplitter();
+    this.splitter = new LengthBasedSplitter({
+      maxFrameLength: options.maxFrameLength ?? 10 * 1024 * 1024, // Default to 10MB
+    });
     this.decoder = new PlistServiceDecoder();
     this.encoder = new PlistServiceEncoder();
 
