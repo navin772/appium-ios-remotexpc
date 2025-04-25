@@ -29,14 +29,5 @@ jobs:
     - name: Build project including tests
       run: npm run build
     
-    - name: Validate test files
-      run: |
-        echo "Validating test files..."
-        # Check if test files were built successfully
-        if [ -f "build/test/tunnel-test.js" ] && [ -f "build/test/ReadPairRecord-test.js" ] && [ -f "build/test/diagnostics-test.js" ]; then
-          echo "✅ Test files built successfully"
-        else
-          echo "❌ Test files failed to build"
-          exit 1
-        fi
-        echo "Note: Actual tests are skipped in CI as they require physical iOS devices and sudo privileges"
+    - name: Run unit tests
+      run: npm run test:unit
