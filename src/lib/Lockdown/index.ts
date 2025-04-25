@@ -4,8 +4,8 @@ import tls, { type ConnectionOptions, TLSSocket } from 'tls';
 import { BasePlistService } from '../../base-plist-service.js';
 import { type PairRecord } from '../PairRecord/index.js';
 import { PlistService } from '../Plist/plist-service.js';
+import { connectAndRelay, createUsbmux } from '../Usbmux/index.js';
 
-const { createUsbmux, connectAndRelay } = await import('../Usbmux/index.js');
 const LABEL = 'appium-internal';
 
 interface Device {

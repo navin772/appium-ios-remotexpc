@@ -22,9 +22,9 @@
     "lint:fix": "eslint src --ext .ts --fix",
     "test": "sudo mocha test/integration/**/*.ts",
     "test:all": "sudo mocha -r tsx/cjs test/run-integration-tests.ts",
-    "test:tunnel": "sudo mocha test/integration/tunnel-test.ts",
-    "test:pair-record": "sudo mocha test/integration/read-pair-record-test.ts",
-    "test:diagnostics": "sudo mocha test/integration/diagnostics-test.ts"
+    "test:tunnel": "sudo mocha test/integration/tunnel-test.ts --exit --timeout 1m",
+    "test:pair-record": "sudo mocha test/integration/read-pair-record-test.ts --exit --timeout 1m",
+    "test:diagnostics": "sudo mocha test/integration/diagnostics-test.ts --exit --timeout 1m"
   },
   "keywords": [],
   "author": "",

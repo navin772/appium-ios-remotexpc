@@ -5,8 +5,7 @@ import {
   upgradeSocketToTLS,
 } from '../../../lib/Lockdown/index.js';
 import { PlistService } from '../../../lib/Plist/plist-service.js';
-
-const { createUsbmux } = await import('../../../lib/Usbmux/index.js');
+import { createUsbmux } from '../../../lib/Usbmux/index.js';
 
 const LABEL = 'appium-internal';
 

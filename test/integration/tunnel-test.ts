@@ -16,10 +16,10 @@ describe('Tunnel and Syslog Service', function () {
   let remoteXPC: RemoteXpcConnection;
   let syslogService: SyslogService;
   let service: any;
-
+  const udid = '';
   before(async function () {
     console.log('Creating connection...');
-    const { lockdownService, device } = await createLockdownServiceByUDID();
+    const { lockdownService, device } = await createLockdownServiceByUDID(udid);
     const { socket } = await startCoreDeviceProxy(
       lockdownService,
       device.DeviceID,

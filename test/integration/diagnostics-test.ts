@@ -28,20 +28,16 @@ describe('Diagnostics Service', function () {
     );
 
     tunnelResult = await tunManager.getTunnel(socket);
-
-    // Fix: Check if RsdPort is defined and provide a fallback value if it's undefined
-    const rsdPort = tunnelResult.RsdPort ?? 0; // Using nullish coalescing operator
+    const rsdPort = tunnelResult.RsdPort ?? 0;
 
     remoteXPC = new RemoteXpcConnection([tunnelResult.Address, rsdPort]);
     await remoteXPC.connect();
     remoteXPC.listAllServices();
 
-    // Find the diagnostics service
     const diagnosticsService = remoteXPC.findService(
       DiagnosticsService.RSD_SERVICE_NAME,
     );
 
-    // Create diagnostics service with the address and port
     diagService = new DiagnosticsService([
       tunnelResult.Address,
       parseInt(diagnosticsService.port),
@@ -49,6 +45,9 @@ describe('Diagnostics Service', function () {
   });
 
   after(async function () {
+    if (diagService) {
+      await diagService.shutdown();
+    }
     if (tunManager) {
       await tunManager.closeTunnel();
     }
