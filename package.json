@@ -24,7 +24,8 @@
     "test:all": "sudo mocha -r tsx/cjs test/run-integration-tests.ts",
     "test:tunnel": "sudo mocha test/integration/tunnel-test.ts --exit --timeout 1m",
     "test:pair-record": "sudo mocha test/integration/read-pair-record-test.ts --exit --timeout 1m",
-    "test:diagnostics": "sudo mocha test/integration/diagnostics-test.ts --exit --timeout 1m"
+    "test:diagnostics": "sudo mocha test/integration/diagnostics-test.ts --exit --timeout 1m",
+    "test:unit": "mocha test/unit/**/*.ts --exit --timeout 2m"
   },
   "keywords": [],
   "author": "",
@@ -35,9 +36,11 @@
     "@eslint/js": "^9.23.0",
     "@trivago/prettier-plugin-sort-imports": "^5.2.2",
     "@types/chai": "^5.2.1",
+    "@types/chai-as-promised": "^8.0.2",
     "@types/mocha": "^10.0.10",
     "appium": "^2.17.1",
     "chai": "^5.2.0",
+    "chai-as-promised": "^8.0.1",
     "eslint": "^9.23.0",
     "eslint-config-prettier": "^10.1.2",
     "eslint-plugin-unicorn": "^58.0.0",
