@@ -416,24 +416,49 @@ export class Usbmux extends BaseServiceSocket {
     responseCallback: (data: any) => any,
   ): { tag: number; receivePromise: Promise<any> } {
     const tag = this._tag++;
+    let timeoutId: NodeJS.Timeout;
     const receivePromise = new Promise<any>((resolve, reject) => {
       this._responseCallbacks[tag] = (data) => {
         try {
+          // Clear the timeout to prevent it from triggering
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+          }
+
+          // Process the response
           resolve(responseCallback(data));
         } catch (e) {
           reject(e);
+        } finally {
+          delete this._responseCallbacks[tag];
         }
       };
-      setTimeout(
-        () =>
+
+      // Set the timeout handler
+      timeoutId = setTimeout(() => {
+        if (this._responseCallbacks[tag]) {
+          delete this._responseCallbacks[tag];
+          console.warn(
+            `Timeout waiting for response with tag ${tag} after ${timeout}ms`,
+          );
           reject(
             new Error(
-              `Failed to receive any data within the timeout: ${timeout}`,
+              `Failed to receive any data within the timeout: ${timeout}ms - The device might be busy or unresponsive`,
             ),
-          ),
-        timeout,
-      );
+          );
+        }
+      }, timeout);
     });
+
+    // Add cleanup handler when promise is settled
+    receivePromise
+      .catch(() => {})
+      .finally(() => {
+        if (this._responseCallbacks[tag]) {
+          delete this._responseCallbacks[tag];
+        }
+      });
+
     return { tag, receivePromise };
   }
 }

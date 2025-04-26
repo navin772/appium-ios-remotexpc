@@ -63,14 +63,4 @@ describe('usbmux', function () {
     const device = await usbmux.findDevice(UDID);
     device.Properties.SerialNumber.should.be.equal(UDID);
   });
-
-  it.skip('should connect to correct device', async function () {
-    ({ server, socket } = await getServerWithFixtures(fixtures.DEVICE_LIST));
-    usbmux = new Usbmux(socket);
-    await usbmux.connect(UDID, 62078);
-    // const socket: Socket = await connectAndRelay(UDID, 62078);
-    // console.log('Socket connected, creating LockdownService');
-
-    // const service = new LockdownService(socket, UDID, true);
-  });
 });

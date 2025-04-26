@@ -15,7 +15,7 @@ describe('Diagnostics Service', function () {
   let tunnelResult: TunnelConnection;
   let remoteXPC: RemoteXpcConnection;
   let diagService: DiagnosticsService;
-  const udid = '';
+  const udid = process.env.UDID || '';
 
   before(async function () {
     console.log('Creating connection...');
