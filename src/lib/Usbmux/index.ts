@@ -1,4 +1,4 @@
-import { plist, logger } from '@appium/support';
+import { logger, plist } from '@appium/support';
 import net, { Socket } from 'net';
 import os from 'os';
 import { Transform } from 'stream';

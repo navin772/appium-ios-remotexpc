@@ -386,7 +386,9 @@ function readDictionaryKey(reader: Reader): string {
   const bytes: number[] = [];
   while (true) {
     const b = reader.readByte();
-    if (b === 0) {break;}
+    if (b === 0) {
+      break;
+    }
     bytes.push(b);
   }
   const key = Buffer.from(bytes).toString('utf8');

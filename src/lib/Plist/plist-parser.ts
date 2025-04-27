@@ -10,10 +10,14 @@ export function parsePlist(xmlData: string | Buffer): Record<string, any> {
   const parser = new DOMParser();
   const doc = parser.parseFromString(xmlStr.toString(), 'text/xml');
 
-  if (!doc) {throw new Error('Invalid XML response');}
+  if (!doc) {
+    throw new Error('Invalid XML response');
+  }
 
   function parseNode(node: Element): any {
-    if (!node) {return null;}
+    if (!node) {
+      return null;
+    }
 
     switch (node.nodeName) {
       case 'dict':

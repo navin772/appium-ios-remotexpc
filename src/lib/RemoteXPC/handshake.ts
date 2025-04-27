@@ -25,8 +25,11 @@ class Handshake {
   async sendFrame(frame: Buffer): Promise<void> {
     return new Promise((resolve, reject) => {
       this._socket.write(frame, (error: Error | null | undefined) => {
-        if (error) {reject('error: ' + error);}
-        else {resolve();}
+        if (error) {
+          reject('error: ' + error);
+        } else {
+          resolve();
+        }
       });
     });
   }
