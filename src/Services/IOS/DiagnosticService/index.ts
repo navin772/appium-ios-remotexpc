@@ -1,7 +1,10 @@
+import { logger } from '@appium/support';
+
 import ServiceConnection from '../../../service-connection.js';
 // Import MobileGestaltKeys directly to avoid module resolution issues
 import { MobileGestaltKeys } from './keys.js';
 
+const log = logger.getLogger('DiagnosticService');
 interface Service {
   serviceName: string;
   port: string;
@@ -60,7 +63,7 @@ class DiagnosticsService {
       if (!response || !Array.isArray(response) || response.length === 0) {
         throw new Error('Invalid response from MobileGestalt');
       }
-      console.log('response', response);
+      log.info('response', response);
       const responseObj = response[0];
 
       // Check if MobileGestalt is deprecated (iOS >= 17.4)
@@ -70,7 +73,7 @@ class DiagnosticsService {
       ) {
         throw new Error('MobileGestalt deprecated (iOS >= 17.4)');
       }
-      console.log('responseObj', responseObj);
+      log.info('responseObj', responseObj);
       // Check for success
       if (
         responseObj.Status !== 'Success' ||
@@ -85,7 +88,7 @@ class DiagnosticsService {
 
       return result;
     } catch (error) {
-      console.error('Error querying MobileGestalt:', error);
+      log.error('Error querying MobileGestalt:', error);
       throw error;
     }
   }
@@ -112,7 +115,7 @@ class DiagnosticsService {
 
       // Send the request
       const response = await conn.sendPlistRequest(request);
-      console.log('Restart response:', response);
+      log.info('Restart response:', response);
 
       // Ensure we return a non-null object
       if (!response || !Array.isArray(response) || response.length === 0) {
@@ -121,7 +124,7 @@ class DiagnosticsService {
 
       return response[0] || {};
     } catch (error) {
-      console.error('Error restarting device:', error);
+      log.error('Error restarting device:', error);
       throw error;
     }
   }
@@ -148,7 +151,7 @@ class DiagnosticsService {
 
       // Send the request
       const response = await conn.sendPlistRequest(request);
-      console.log('Shutdown response:', response);
+      log.info('Shutdown response:', response);
 
       // Ensure we return a non-null object
       if (!response || !Array.isArray(response) || response.length === 0) {
@@ -157,7 +160,7 @@ class DiagnosticsService {
 
       return response[0] || {};
     } catch (error) {
-      console.error('Error shutting down device:', error);
+      log.error('Error shutting down device:', error);
       throw error;
     }
   }
@@ -184,7 +187,7 @@ class DiagnosticsService {
 
       // Send the request
       const response = await conn.sendPlistRequest(request);
-      console.log('Sleep response:', response);
+      log.info('Sleep response:', response);
 
       // Ensure we return a non-null object
       if (!response || !Array.isArray(response) || response.length === 0) {
@@ -193,7 +196,7 @@ class DiagnosticsService {
 
       return response[0] || {};
     } catch (error) {
-      console.error('Error putting device to sleep:', error);
+      log.error('Error putting device to sleep:', error);
       throw error;
     }
   }
@@ -223,13 +226,19 @@ class DiagnosticsService {
         Request: 'IORegistry',
       };
 
-      if (options?.plane) request.CurrentPlane = options.plane;
-      if (options?.name) request.EntryName = options.name;
-      if (options?.ioClass) request.EntryClass = options.ioClass;
+      if (options?.plane) {
+        request.CurrentPlane = options.plane;
+      }
+      if (options?.name) {
+        request.EntryName = options.name;
+      }
+      if (options?.ioClass) {
+        request.EntryClass = options.ioClass;
+      }
 
       // Send the request
       const response = await conn.sendPlistRequest(request);
-      console.log('IORegistry response:', response);
+      log.info('IORegistry response:', response);
       // Ensure we have a valid response
       if (!response || !Array.isArray(response) || response.length === 0) {
         throw new Error('Invalid response from IORegistry');
@@ -237,7 +246,7 @@ class DiagnosticsService {
 
       return response || {};
     } catch (error) {
-      console.error('Error querying IORegistry:', error);
+      log.error('Error querying IORegistry:', error);
       throw error;
     }
   }
@@ -271,7 +280,7 @@ class DiagnosticsService {
     };
 
     const response = await connection.sendPlistRequest(checkin);
-    console.log('Service check-in response:', response);
+    log.info('Service check-in response:', response);
     return connection;
   }
 }

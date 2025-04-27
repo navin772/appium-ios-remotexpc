@@ -1,3 +1,4 @@
+import { logger } from '@appium/support';
 import { Socket } from 'net';
 import { TLSSocket } from 'tls';
 
@@ -5,6 +6,7 @@ import LengthBasedSplitter from './length-based-splitter.js';
 import PlistServiceDecoder from './plist-decoder.js';
 import PlistServiceEncoder from './plist-encoder.js';
 
+const log = logger.getLogger('Plist');
 /**
  * Message type for plist communications
  */
@@ -112,7 +114,7 @@ export class PlistService {
     try {
       this.socket.end();
     } catch (error) {
-      console.error(
+      log.error(
         'Error closing socket:',
         error instanceof Error ? error.message : String(error),
       );
@@ -143,6 +145,6 @@ export class PlistService {
    * @param error The error that occurred
    */
   private handleError(error: Error): void {
-    console.error(`PlistService Error: ${error.message}`);
+    log.error(`PlistService Error: ${error.message}`);
   }
 }

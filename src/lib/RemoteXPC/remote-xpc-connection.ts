@@ -1,6 +1,9 @@
+import { logger } from '@appium/support';
 import net from 'node:net';
 
 import Handshake from './handshake.js';
+
+const log = logger.getLogger('RemoteXpcConnection');
 
 interface Service {
   serviceName: string;
@@ -47,7 +50,7 @@ class RemoteXpcConnection {
         this.socket.setKeepAlive(true);
 
         this.socket.once('error', (error) => {
-          console.error('Connection error:', error);
+          log.error('Connection error:', error);
           this._isConnected = false;
           reject(error);
         });
@@ -69,7 +72,7 @@ class RemoteXpcConnection {
         });
 
         this.socket.on('close', () => {
-          console.log('Socket closed');
+          log.info('Socket closed');
           this._isConnected = false;
         });
 
@@ -83,13 +86,13 @@ class RemoteXpcConnection {
               await this.handshake.perform();
             }
           } catch (error) {
-            console.error('Handshake failed:', error);
+            log.error('Handshake failed:', error);
             await this.close();
             reject(error);
           }
         });
       } catch (error) {
-        console.error('Failed to create connection:', error);
+        log.error('Failed to create connection:', error);
         reject(error);
       }
     });

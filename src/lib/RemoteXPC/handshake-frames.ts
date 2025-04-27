@@ -11,7 +11,7 @@ class Struct {
 
     this.types = [];
     for (const ch of fmt.slice(1)) {
-      if ('0123456789'.includes(ch)) continue;
+      if ('0123456789'.includes(ch)) {continue;}
       this.types.push(ch as StructType);
     }
   }
@@ -19,10 +19,10 @@ class Struct {
   byteLength(): number {
     let total = 0;
     for (const t of this.types) {
-      if (t === 'H') total += 2;
-      else if (t === 'B') total += 1;
-      else if (t === 'L') total += 4;
-      else throw new Error('Unsupported type: ' + t);
+      if (t === 'H') {total += 2;}
+      else if (t === 'B') {total += 1;}
+      else if (t === 'L') {total += 4;}
+      else {throw new Error('Unsupported type: ' + t);}
     }
     return total;
   }
@@ -104,9 +104,9 @@ class Flags {
 
 // Utility function
 function rawDataRepr(data: Buffer | null | undefined): string {
-  if (!data || data.length === 0) return 'None';
+  if (!data || data.length === 0) {return 'None';}
   let r = data.toString('hex');
-  if (r.length > 20) r = r.slice(0, 20) + '...';
+  if (r.length > 20) {r = r.slice(0, 20) + '...';}
   return '<hex:' + r + '>';
 }
 

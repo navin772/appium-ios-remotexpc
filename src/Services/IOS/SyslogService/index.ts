@@ -1,7 +1,9 @@
+import { logger } from '@appium/support';
 import { EventEmitter } from 'events';
 
 import ServiceConnection from '../../../service-connection.js';
 
+const log = logger.getLogger('Syslog');
 // Define interfaces for clarity
 interface Packet {
   protocol: 'TCP' | 'UDP';
@@ -63,7 +65,7 @@ class SyslogService {
     };
 
     const response = await conn.sendPlistRequest(request);
-    console.log('Syslog capture started:', response);
+    log.info('Syslog capture started:', response);
   }
 
   async restart(Service: Service) {
@@ -74,9 +76,9 @@ class SyslogService {
       const request = { Request: 'Restart' };
       // Send the restart request.
       const res = await conn.sendPlistRequest(request);
-      console.log('Restart response:', res);
+      log.info('Restart response:', res);
     } catch (error) {
-      console.error('Error during restart:', error);
+      log.error('Error during restart:', error);
     }
   }
 
@@ -89,22 +91,22 @@ class SyslogService {
       if (packet.protocol === 'TCP') {
         // Filter packets by checking if they contain printable text
         if (this.isMostlyPrintable(packet.payload)) {
-          console.log('Received syslog-like TCP packet:');
-          console.log('  Source:', packet.src);
-          console.log('  Destination:', packet.dst);
-          console.log('  Source port:', packet.sourcePort);
-          console.log('  Destination port:', packet.destPort);
-          console.log('  Payload length:', packet.payload.length);
-          console.log(
+          log.info('Received syslog-like TCP packet:');
+          log.info('  Source:', packet.src);
+          log.info('  Destination:', packet.dst);
+          log.info('  Source port:', packet.sourcePort);
+          log.info('  Destination port:', packet.destPort);
+          log.info('  Payload length:', packet.payload.length);
+          log.info(
             '  Message:',
             packet.payload.toString().replace(/[^\x20-\x7E]/g, ''),
           );
         } else {
-          console.log('TCP packet not mostly printable, ignoring.');
+          log.info('TCP packet not mostly printable, ignoring.');
         }
       } else if (packet.protocol === 'UDP') {
         // Process UDP packets if needed
-        console.log('Received UDP packet (not filtered here):', packet);
+        log.info('Received UDP packet (not filtered here):', packet);
       }
     });
   }
@@ -117,7 +119,9 @@ class SyslogService {
   private isMostlyPrintable(buffer: Buffer): boolean {
     try {
       const str = buffer.toString('utf8');
-      if (!str || str.length === 0) return false;
+      if (!str || str.length === 0) {
+        return false;
+      }
 
       let printableCount = 0;
       for (let i = 0; i < str.length; i++) {
@@ -130,7 +134,7 @@ class SyslogService {
 
       return printableCount / str.length > 0.5;
     } catch (error) {
-      console.log(error);
+      log.info(error);
       return false;
     }
   }
@@ -164,7 +168,7 @@ class SyslogService {
     };
 
     const response = await connection.sendPlistRequest(checkin);
-    console.log('Service check-in response:', response);
+    log.info('Service check-in response:', response);
     return connection;
   }
 }

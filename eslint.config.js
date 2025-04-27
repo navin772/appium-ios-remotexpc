@@ -1,28 +1,20 @@
-import eslint from '@eslint/js';
+import appiumConfig from '@appium/eslint-config-appium-ts';
 import unicorn from 'eslint-plugin-unicorn';
-import tseslint from 'typescript-eslint';
 
-export default tseslint.config(
-  eslint.configs.recommended,
-  ...tseslint.configs.recommended,
+export default [
+  ...appiumConfig,
   {
     files: ['**/*.ts'],
-    languageOptions: {
-      ecmaVersion: 2022,
-      sourceType: 'module',
-      parser: tseslint.parser,
-      parserOptions: {
-        project: './tsconfig.json',
-      },
-    },
     plugins: {
       unicorn: unicorn,
+    },
+    linterOptions: {
+      reportUnusedDisableDirectives: 'off',
     },
     rules: {
       quotes: ['error', 'single'],
       semi: ['error', 'always'],
       '@typescript-eslint/no-explicit-any': 'off',
-      '@typescript-eslint/no-unused-vars': 'off',
       '@typescript-eslint/member-ordering': [
         'error',
         {
@@ -50,4 +42,4 @@ export default tseslint.config(
     },
     ignores: ['**/build/**', '**/node_modules/**'],
   },
-);
+];

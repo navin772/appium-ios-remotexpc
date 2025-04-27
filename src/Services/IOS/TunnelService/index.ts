@@ -1,3 +1,4 @@
+import { logger } from '@appium/support';
 import { TLSSocket } from 'tls';
 
 import {
@@ -7,6 +8,7 @@ import {
 import { PlistService } from '../../../lib/Plist/plist-service.js';
 import { createUsbmux } from '../../../lib/Usbmux/index.js';
 
+const log = logger.getLogger('TunnelService');
 const LABEL = 'appium-internal';
 
 /**
@@ -41,9 +43,7 @@ export async function startCoreDeviceProxy(
     throw new Error('Service didnt return a port');
   }
 
-  console.log(
-    `Connecting to CoreDeviceProxy service on port: ${response.Port}`,
-  );
+  log.info(`Connecting to CoreDeviceProxy service on port: ${response.Port}`);
 
   const usbmux = await createUsbmux();
 
@@ -63,7 +63,7 @@ export async function startCoreDeviceProxy(
     Number(response.Port),
   );
 
-  console.log('Socket connected to CoreDeviceProxy, upgrading to TLS...');
+  log.info('Socket connected to CoreDeviceProxy, upgrading to TLS...');
 
   const fullTlsOptions = {
     ...tlsOptions,

@@ -74,7 +74,7 @@ npm run build
 
 This project uses GitHub Actions for continuous integration and Dependabot for dependency management:
 
-- **Lint and Build**: Automatically runs linting and builds the project on Node.js 20.x and 22.x
+- **Lint and Build**: Automatically runs linting and builds the project on Node.js LTS.
 - **Format Check**: Ensures code formatting adheres to project standards
 - **Test Validation**: Validates that test files compile correctly (actual tests require physical devices)
 - **Dependabot**: Automatically creates PRs for dependency updates weekly

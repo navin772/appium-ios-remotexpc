@@ -1,4 +1,4 @@
-import { plist } from '@appium/support';
+import { plist, logger } from '@appium/support';
 import net, { Socket } from 'net';
 import os from 'os';
 import { Transform } from 'stream';
@@ -7,6 +7,8 @@ import { type PairRecord, processPlistResponse } from '../PairRecord/index.js';
 import { LengthBasedSplitter } from '../Plist/index.js';
 import { UsbmuxDecoder } from './usbmux-decoder.js';
 import { UsbmuxEncoder } from './usbmux-encoder.js';
+
+const log = logger.getLogger('Usbmux');
 
 export const USBMUXD_PORT = 27015;
 export const LOCKDOWN_PORT = 62078;
@@ -79,7 +81,7 @@ export async function getDefaultSocket(
     !opts.socketPort &&
     !opts.socketHost
   ) {
-    console.log(
+    log.debug(
       `Using USBMUXD_SOCKET_ADDRESS environment variable as default socket: ${process.env.USBMUXD_SOCKET_ADDRESS}`,
     );
     // "unix:" or "UNIX:" prefix is optional for unix socket paths.
@@ -154,11 +156,11 @@ export class BaseServiceSocket {
   protected _assignClientFailureHandlers(stream: Transform): void {
     if (this._socketClient) {
       this._socketClient.on('error', (e) => {
-        console.error(`Socket client error: ${e.message}`);
+        log.error(`Socket client error: ${e.message}`);
         stream.emit('error', e);
       });
       this._socketClient.on('close', () => {
-        console.log('Socket client closed');
+        log.info('Socket client closed');
         stream.emit('close');
       });
     }
@@ -438,7 +440,7 @@ export class Usbmux extends BaseServiceSocket {
       timeoutId = setTimeout(() => {
         if (this._responseCallbacks[tag]) {
           delete this._responseCallbacks[tag];
-          console.warn(
+          log.warn(
             `Timeout waiting for response with tag ${tag} after ${timeout}ms`,
           );
           reject(
@@ -508,7 +510,7 @@ export class RelayService {
    * @returns Promise that resolves when the relay is set up
    */
   async start(): Promise<void> {
-    console.log(
+    log.info(
       `Starting relay to device ${this.deviceID} on port ${this.devicePort}...`,
     );
 
@@ -518,7 +520,7 @@ export class RelayService {
 
     // Set up the relay server
     this.server = net.createServer((localSocket) => {
-      console.log('🔌 Local client connected to relay!');
+      log.info('🔌 Local client connected to relay!');
 
       // Set up the bidirectional pipe between local socket and usbmux connection
       if (this.usbmuxClient) {
@@ -527,11 +529,11 @@ export class RelayService {
 
       // Handle socket events
       localSocket.on('close', () => {
-        console.log('Local connection closed (tunnel remains open).');
+        log.info('Local connection closed (tunnel remains open).');
       });
 
       localSocket.on('error', (err) => {
-        console.error('Local socket error:', err);
+        log.error('Local socket error:', err);
       });
     });
 
@@ -542,7 +544,7 @@ export class RelayService {
       }
 
       this.server.listen(this.relayPort, () => {
-        console.log(`Relay server running on localhost:${this.relayPort}`);
+        log.info(`Relay server running on localhost:${this.relayPort}`);
         resolve();
       });
 
@@ -561,7 +563,7 @@ export class RelayService {
       const socket = net.connect(
         { host: '127.0.0.1', port: this.relayPort },
         () => {
-          console.log('Connected to service via local relay.');
+          log.info('Connected to service via local relay.');
           resolve(socket);
         },
       );
@@ -579,7 +581,7 @@ export class RelayService {
     return new Promise<void>((resolve) => {
       if (this.server) {
         this.server.close(() => {
-          console.log('Relay server stopped');
+          log.info('Relay server stopped');
           resolve();
         });
       } else {
@@ -612,9 +614,7 @@ export async function connectAndRelay(
     return await relay.connect();
   } catch (error) {
     // Clean up if there's an error
-    await relay
-      .stop()
-      .catch((err) => console.error('Error stopping relay:', err));
+    await relay.stop().catch((err) => log.error('Error stopping relay:', err));
     throw error;
   }
 }

@@ -1,5 +1,7 @@
+import { logger } from '@appium/support';
 import net from 'node:net';
 
+const log = logger.getLogger('ServiceConnection');
 export interface ServiceConnectionOptions {
   keepAlive?: boolean;
   createConnectionTimeout?: number;
@@ -36,7 +38,7 @@ export class ServiceConnection {
         { host: hostname, port: Number(port) },
         () => {
           socket.setTimeout(0);
-          if (keepAlive) socket.setKeepAlive(true);
+          if (keepAlive) {socket.setKeepAlive(true);}
           resolve(new ServiceConnection(socket));
         },
       );
@@ -55,9 +57,9 @@ export class ServiceConnection {
    */
   static createPlist(obj: Record<string, any>): string {
     function convert(value: any): string {
-      if (typeof value === 'number') return `<integer>${value}</integer>`;
-      if (typeof value === 'boolean') return value ? '<true/>' : '<false/>';
-      if (typeof value === 'string') return `<string>${value}</string>`;
+      if (typeof value === 'number') {return `<integer>${value}</integer>`;}
+      if (typeof value === 'boolean') {return value ? '<true/>' : '<false/>';}
+      if (typeof value === 'string') {return `<string>${value}</string>`;}
       if (Array.isArray(value)) {
         return `<array>${value.map((item) => convert(item)).join('')}</array>`;
       }
@@ -96,10 +98,10 @@ export class ServiceConnection {
       // Find all complete plists in the string
       while (true) {
         const plistStart = xmlStr.indexOf('<plist', currentPos);
-        if (plistStart === -1) break;
+        if (plistStart === -1) {break;}
 
         const plistEnd = xmlStr.indexOf('</plist>', plistStart);
-        if (plistEnd === -1) break;
+        if (plistEnd === -1) {break;}
 
         // Extract the complete plist document including XML declaration
         const xmlDeclStart = Math.max(
@@ -113,7 +115,7 @@ export class ServiceConnection {
       }
 
       if (plists.length === 0) {
-        console.error('No complete plist found in response');
+        log.error('No complete plist found in response');
         return null;
       }
 
@@ -125,7 +127,7 @@ export class ServiceConnection {
         const dictStart = plistXml.indexOf('<dict>');
         const dictEnd = plistXml.lastIndexOf('</dict>');
 
-        if (dictStart === -1 || dictEnd === -1) continue;
+        if (dictStart === -1 || dictEnd === -1) {continue;}
 
         const dictContent = plistXml.substring(dictStart + 6, dictEnd);
         const obj: Record<string, any> = {};
@@ -171,7 +173,7 @@ export class ServiceConnection {
 
       return results.length > 0 ? results : null;
     } catch (error) {
-      console.error('Failed to parse response:', error);
+      log.error('Failed to parse response:', error);
       return null;
     }
   }
@@ -198,7 +200,7 @@ export class ServiceConnection {
 
         const onData = (data: Buffer) => {
           responseBuffer = Buffer.concat([responseBuffer, data]);
-          console.log('responseBuffer', responseBuffer.toString('utf8'));
+          log.debug('responseBuffer', responseBuffer.toString('utf8'));
           if (responseBuffer.toString('utf8').includes('</plist>')) {
             this.socket.removeListener('data', onData);
             // Skip a 16-byte header when parsing the response.

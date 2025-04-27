@@ -25,8 +25,8 @@ class Handshake {
   async sendFrame(frame: Buffer): Promise<void> {
     return new Promise((resolve, reject) => {
       this._socket.write(frame, (error: Error | null | undefined) => {
-        if (error) reject('error: ' + error);
-        else resolve();
+        if (error) {reject('error: ' + error);}
+        else {resolve();}
       });
     });
   }
@@ -34,7 +34,7 @@ class Handshake {
   async sendRequest(data: object): Promise<void> {
     const flags: number = XpcConstants.XPC_FLAGS_ALWAYS_SET;
     const requestMessage: XPCMessage = {
-      flags: flags,
+      flags,
       id: BigInt(this.nextMessageId[Http2Constants.ROOT_CHANNEL]),
       body: data,
     };

@@ -1,8 +1,10 @@
+import { logger } from '@appium/support';
 import { Socket } from 'net';
 
 import createPlist from './plist-creator.js';
 import parsePlist from './plist-parser.js';
 
+const log = logger.getLogger('UsbmuxRequest');
 /**
  * Send a plist request to usbmuxd and receive response
  * @param client - Socket connected to usbmuxd
@@ -19,7 +21,7 @@ export function sendUsbmuxPlistRequest(
 ): Promise<Record<string, any>> {
   return new Promise((resolve, reject) => {
     const requestPlist = createPlist(requestObj);
-    console.log(`\n📡 Sending ${type} PLIST Request:\n`, requestPlist);
+    log.info(`\n📡 Sending ${type} PLIST Request:\n`, requestPlist);
 
     const payloadBuffer = Buffer.from(requestPlist, 'utf8');
 
@@ -63,7 +65,7 @@ export function sendUsbmuxPlistRequest(
           if (plistStart >= 0) {
             const xmlStr = bufferString.substring(plistStart);
             const result = parsePlist(xmlStr);
-            console.log(
+            log.info(
               `\n📩 Received ${type} PLIST Response:\n`,
               JSON.stringify(result, null, 2),
             );
@@ -72,7 +74,7 @@ export function sendUsbmuxPlistRequest(
             // Fallback to assuming header is exactly 16 bytes
             const xmlStr = responseBuffer.slice(16).toString();
             const result = parsePlist(xmlStr);
-            console.log(
+            log.info(
               `\n📩 Received ${type} PLIST Response:\n`,
               JSON.stringify(result, null, 2),
             );
@@ -80,7 +82,7 @@ export function sendUsbmuxPlistRequest(
           }
         }
       } catch (err) {
-        console.warn(
+        log.warn(
           'Error processing usbmux data (will continue waiting for more data):',
           err,
         );

@@ -5,10 +5,15 @@
  */
 export function createPlist(obj: Record<string, any>): string {
   function convert(value: any): string {
-    if (typeof value === 'number') return `<integer>${value}</integer>`;
-    if (typeof value === 'boolean') return value ? '<true/>' : '<false/>';
-    if (typeof value === 'string')
+    if (typeof value === 'number') {
+      return `<integer>${value}</integer>`;
+    }
+    if (typeof value === 'boolean') {
+      return value ? '<true/>' : '<false/>';
+    }
+    if (typeof value === 'string') {
       return `<string>${escapeXml(value)}</string>`;
+    }
     if (Array.isArray(value)) {
       return `<array>${value.map((item) => convert(item)).join('')}</array>`;
     }
