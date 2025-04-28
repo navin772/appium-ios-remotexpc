@@ -1,7 +1,7 @@
 import net from 'node:net';
 
 import { BasePlistService } from './base-plist-service.js';
-import type { PlistServiceOptions } from './lib/Plist/plist-service.js';
+import type { PlistServiceOptions } from './lib/plist/plist-service.js';
 import type { PlistDictionary } from './lib/types.js';
 
 export interface ServiceConnectionOptions {

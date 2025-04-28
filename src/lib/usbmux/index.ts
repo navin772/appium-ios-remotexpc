@@ -2,9 +2,9 @@ import net, { Socket } from 'net';
 import os from 'os';
 
 import { BaseSocketService } from '../../base-socket-service.js';
-import { type PairRecord, processPlistResponse } from '../PairRecord/index.js';
-import { type RawPairRecordResponse } from '../PairRecord/pair-record.js';
-import { LengthBasedSplitter, parsePlist } from '../Plist/index.js';
+import { type PairRecord, processPlistResponse } from '../pair-record/index.js';
+import { type RawPairRecordResponse } from '../pair-record/pair-record.js';
+import { LengthBasedSplitter, parsePlist } from '../plist/index.js';
 import type { PlistDictionary } from '../types.js';
 import { type DecodedUsbmux, UsbmuxDecoder } from './usbmux-decoder.js';
 import { UsbmuxEncoder } from './usbmux-encoder.js';
@@ -138,7 +138,7 @@ export async function getDefaultSocket(
 }
 
 /**
- * Usbmux class for communicating with usbmuxd
+ * usbmux class for communicating with usbmuxd
  */
 export class Usbmux extends BaseSocketService {
   private readonly _decoder: UsbmuxDecoder;
@@ -151,7 +151,7 @@ export class Usbmux extends BaseSocketService {
   >;
 
   /**
-   * Creates a new Usbmux instance
+   * Creates a new usbmux instance
    * @param socketClient - Connected socket to usbmuxd
    */
   constructor(socketClient: Socket) {
@@ -436,9 +436,9 @@ export class Usbmux extends BaseSocketService {
 }
 
 /**
- * Creates a new Usbmux instance
+ * Creates a new usbmux instance
  * @param opts - Socket options
- * @returns Promise that resolves with a Usbmux instance
+ * @returns Promise that resolves with a usbmux instance
  */
 export async function createUsbmux(
   opts: Partial<SocketOptions> = {},

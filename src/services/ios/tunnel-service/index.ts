@@ -3,10 +3,10 @@ import { TLSSocket } from 'tls';
 import {
   LockdownService,
   upgradeSocketToTLS,
-} from '../../../lib/Lockdown/index.js';
-import { PlistService } from '../../../lib/Plist/plist-service.js';
+} from '../../../lib/lockdown/index.js';
+import { PlistService } from '../../../lib/plist/plist-service.js';
 
-const { createUsbmux } = await import('../../../lib/Usbmux/index.js');
+const { createUsbmux } = await import('../../../lib/usbmux/index.js');
 
 const LABEL = 'appium-internal';
 

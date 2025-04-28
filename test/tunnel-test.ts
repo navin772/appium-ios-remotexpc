@@ -1,10 +1,10 @@
 import type { TunnelConnection } from 'tuntap-bridge';
 
-import SyslogService from '../src/Services/IOS/SyslogService/index.js';
-import { startCoreDeviceProxy } from '../src/Services/IOS/TunnelService/index.js';
-import { createLockdownServiceByUDID } from '../src/lib/Lockdown/index.js';
-import RemoteXpcConnection from '../src/lib/RemoteXPC/remote-xpc-connection.js';
-import TunnelManager from '../src/lib/Tunnel/index.js';
+import SyslogService from '../src/services/ios/syslog-service/index.js';
+import { startCoreDeviceProxy } from '../src/services/ios/tunnel-service/index.js';
+import { createLockdownServiceByUDID } from '../src/lib/lockdown/index.js';
+import RemoteXpcConnection from '../src/lib/remote-xpc/remote-xpc-connection.js';
+import TunnelManager from '../src/lib/tunnel/index.js';
 
 async function test() {
   const tunManager = TunnelManager;
@@ -35,7 +35,7 @@ async function test() {
 
     const syslogService = new SyslogService([tunnelResult.Address, rsdPort]);
     await syslogService.start(service, -1, tunnelResult.tunnelManager);
-    // await SyslogService.restart(restart)
+    // await syslog-service.restart(restart)
     await tunManager.closeTunnel();
   } catch (err) {
     console.error('Failed to establish tunnel:', err);

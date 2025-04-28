@@ -41,9 +41,9 @@ function bufferToPEMString(buffer: Buffer): string {
 }
 
 /**
- * Processes raw response from plist.parsePlist and formats it into a proper PairRecord
+ * Processes raw response from plist.parsePlist and formats it into a proper pair-record
  * @param response - Response from plist.parsePlist(data.payload.PairRecordData)
- * @returns Formatted PairRecord object with properly structured data
+ * @returns Formatted pair-record object with properly structured data
  */
 export function processPlistResponse(
   response: RawPairRecordResponse,

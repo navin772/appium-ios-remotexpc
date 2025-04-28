@@ -3,7 +3,7 @@ import { Socket } from 'node:net';
 import {
   PlistService,
   type PlistServiceOptions,
-} from './lib/Plist/plist-service.js';
+} from './lib/plist/plist-service.js';
 import type { PlistDictionary } from './lib/types.js';
 
 /**

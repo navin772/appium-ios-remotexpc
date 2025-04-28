@@ -2,11 +2,11 @@ import { Socket } from 'node:net';
 import tls, { type ConnectionOptions, TLSSocket } from 'tls';
 
 import { BasePlistService } from '../../base-plist-service.js';
-import { type PairRecord } from '../PairRecord/index.js';
-import { PlistService } from '../Plist/plist-service.js';
+import { type PairRecord } from '../pair-record/index.js';
+import { PlistService } from '../plist/plist-service.js';
 import type { PlistValue } from '../types.js';
 
-const { createUsbmux, connectAndRelay } = await import('../Usbmux/index.js');
+const { createUsbmux, connectAndRelay } = await import('../usbmux/index.js');
 const LABEL = 'appium-internal';
 
 interface Device {
@@ -143,7 +143,7 @@ export class LockdownService extends BasePlistService {
       timeout,
     );
     if (res.Request === 'StartSession' && res.SessionID) {
-      console.log('Lockdown session started, SessionID:', res.SessionID);
+      console.log('lockdown session started, SessionID:', res.SessionID);
       return {
         sessionID: res.SessionID,
         enableSessionSSL: res.EnableSessionSSL,

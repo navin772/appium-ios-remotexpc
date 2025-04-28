@@ -22,14 +22,14 @@ interface Service {
 }
 
 /**
- * SyslogService provides functionality to capture and process syslog messages
+ * syslog-service provides functionality to capture and process syslog messages
  * from a remote device using Apple's XPC services.
  */
 class SyslogService {
   private readonly address: [string, number]; // [host, port]
 
   /**
-   * Creates a new SyslogService instance
+   * Creates a new syslog-service instance
    * @param address Tuple containing [host, port]
    */
   constructor(address: [string, number]) {
@@ -40,7 +40,7 @@ class SyslogService {
    * Starts capturing syslog data from the device
    * @param Service
    * @param pid Process ID to filter (-1 for all processes)
-   * @param tunnelManager Tunnel manager to handle data packets
+   * @param tunnelManager tunnel manager to handle data packets
    * @returns Promise resolving to the initial response from the service
    */
   async start(

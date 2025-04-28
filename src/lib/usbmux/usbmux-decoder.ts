@@ -1,6 +1,6 @@
 import { Transform, type TransformCallback } from 'stream';
 
-import { parsePlist } from '../Plist/index.js';
+import { parsePlist } from '../plist/index.js';
 import type { PlistDictionary } from '../types.js';
 
 const HEADER_LENGTH = 16;

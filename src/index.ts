@@ -1,6 +1,6 @@
 // Export USBMux
-// Export Services
-import * as Services from './Services/index.js';
-import { Usbmux, createUsbmux } from './lib/Usbmux/index.js';
+// Export services
+import * as Services from './services/index.js';
+import { Usbmux, createUsbmux } from './lib/usbmux/index.js';
 
 export { createUsbmux, Services, Usbmux };
