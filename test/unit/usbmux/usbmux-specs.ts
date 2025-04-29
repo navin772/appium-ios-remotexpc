@@ -1,7 +1,7 @@
 import { expect } from 'chai';
 import { Server, Socket } from 'net';
 
-import { Usbmux } from '../../../src/lib/Usbmux/index.js';
+import { Usbmux } from '../../../src/lib/usbmux/index.js';
 import { UDID, fixtures, getServerWithFixtures } from '../fixtures/index.js';
 
 let chai;

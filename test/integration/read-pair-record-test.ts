@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 
-import { createUsbmux } from '../../src/lib/Usbmux/index.js';
+import { createUsbmux } from '../../src/lib/usbmux/index.js';
 
 describe('Pair Record', function () {
   // Increase timeout for integration tests

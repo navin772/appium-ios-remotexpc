@@ -3,9 +3,10 @@ import { Socket } from 'node:net';
 import tls, { type ConnectionOptions, TLSSocket } from 'tls';
 
 import { BasePlistService } from '../../base-plist-service.js';
-import { type PairRecord } from '../PairRecord/index.js';
-import { PlistService } from '../Plist/plist-service.js';
-import { connectAndRelay, createUsbmux } from '../Usbmux/index.js';
+import { type PairRecord } from '../pair-record/index.js';
+import { PlistService } from '../plist/plist-service.js';
+import type { PlistValue } from '../types.js';
+import { connectAndRelay, createUsbmux } from '../usbmux/index.js';
 
 const log = logger.getLogger('Localdown');
 const LABEL = 'appium-internal';
@@ -118,15 +119,13 @@ export function upgradeSocketToTLS(
 }
 
 export class LockdownService extends BasePlistService {
-  private socket: Socket | TLSSocket;
-  private udid: string;
+  private readonly udid: string;
   private _plistAfterTLS?: PlistService;
   private _isTLS = false;
   public _tlsUpgrade?: Promise<void>;
 
   constructor(socket: Socket, udid: string, autoSecure = true) {
     super(socket);
-    this.socket = socket;
     this.udid = udid;
     log.info(`LockdownService initialized for UDID: ${udid}`);
     if (autoSecure) {
@@ -180,11 +179,10 @@ export class LockdownService extends BasePlistService {
       return;
     }
     try {
-      const tlsSocket = await upgradeSocketToTLS(this.socket as Socket, {
+      const tlsSocket = await upgradeSocketToTLS(this.getSocket() as Socket, {
         cert: pairRecord.HostCertificate,
         key: pairRecord.HostPrivateKey,
       });
-      this.socket = tlsSocket;
       this._plistAfterTLS = new PlistService(tlsSocket);
       this._isTLS = true;
       log.info('Successfully upgraded connection to TLS');
@@ -194,11 +192,13 @@ export class LockdownService extends BasePlistService {
     }
   }
 
-  public getSocket() {
-    return this.socket;
+  public getSocket(): Socket | TLSSocket {
+    return this._isTLS && this._plistAfterTLS
+      ? this._plistAfterTLS.getSocket()
+      : this.getPlistService().getSocket();
   }
 
-  public async sendAndReceive(msg: Record<string, unknown>, timeout = 5000) {
+  public async sendAndReceive(msg: Record<string, PlistValue>, timeout = 5000) {
     if (this._isTLS && this._plistAfterTLS) {
       return this._plistAfterTLS.sendPlistAndReceive(msg, timeout);
     }
@@ -208,8 +208,12 @@ export class LockdownService extends BasePlistService {
   public close() {
     log.info('Closing LockdownService connections');
     try {
-      if (!this.socket.destroyed) {
-        this.socket.end();
+      // Close the TLS service if it exists
+      if (this._isTLS && this._plistAfterTLS) {
+        this._plistAfterTLS.close();
+      } else {
+        // Otherwise close the base service
+        super.close();
       }
     } catch (err) {
       log.error('Error closing socket:', err);

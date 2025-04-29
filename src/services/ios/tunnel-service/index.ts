@@ -4,9 +4,10 @@ import { TLSSocket } from 'tls';
 import {
   LockdownService,
   upgradeSocketToTLS,
-} from '../../../lib/Lockdown/index.js';
-import { PlistService } from '../../../lib/Plist/plist-service.js';
-import { createUsbmux } from '../../../lib/Usbmux/index.js';
+} from '../../../lib/lockdown/index.js';
+import { PlistService } from '../../../lib/plist/plist-service.js';
+
+const { createUsbmux } = await import('../../../lib/usbmux/index.js');
 
 const log = logger.getLogger('TunnelService');
 const LABEL = 'appium-internal';

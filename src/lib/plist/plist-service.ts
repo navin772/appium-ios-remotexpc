@@ -2,6 +2,7 @@ import { logger } from '@appium/support';
 import { Socket } from 'net';
 import { TLSSocket } from 'tls';
 
+import type { PlistDictionary } from '../types.js';
 import LengthBasedSplitter from './length-based-splitter.js';
 import PlistServiceDecoder from './plist-decoder.js';
 import PlistServiceEncoder from './plist-encoder.js';
@@ -10,12 +11,26 @@ const log = logger.getLogger('Plist');
 /**
  * Message type for plist communications
  */
-type PlistMessage = Record<string, unknown>;
+type PlistMessage = PlistDictionary;
+
+/**
+ * Options for PlistService
+ */
+export interface PlistServiceOptions {
+  maxFrameLength?: number;
+}
 
 /**
  * Service for communication using plist protocol
  */
 export class PlistService {
+  /**
+   * Gets the underlying socket
+   * @returns The socket used by this service
+   */
+  public getSocket(): Socket | TLSSocket {
+    return this.socket;
+  }
   private readonly socket: Socket | TLSSocket;
   private readonly splitter: LengthBasedSplitter;
   private readonly decoder: PlistServiceDecoder;
@@ -25,12 +40,15 @@ export class PlistService {
   /**
    * Creates a new PlistService instance
    * @param socket The socket to use for communication
+   * @param options Configuration options
    */
-  constructor(socket: Socket) {
+  constructor(socket: Socket, options: PlistServiceOptions = {}) {
     this.socket = socket;
 
     // Set up transformers
-    this.splitter = new LengthBasedSplitter();
+    this.splitter = new LengthBasedSplitter({
+      maxFrameLength: options.maxFrameLength ?? 10 * 1024 * 1024, // Default to 10MB
+    });
     this.decoder = new PlistServiceDecoder();
     this.encoder = new PlistServiceEncoder();
 

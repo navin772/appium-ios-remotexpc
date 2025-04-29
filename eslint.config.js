@@ -5,11 +5,11 @@ export default [
   ...appiumConfig,
   {
     files: ['**/*.ts'],
-    plugins: {
-      unicorn: unicorn,
-    },
     linterOptions: {
       reportUnusedDisableDirectives: 'off',
+    },
+    plugins: {
+      unicorn: unicorn,
     },
     rules: {
       quotes: ['error', 'single'],
