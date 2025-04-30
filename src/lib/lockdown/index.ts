@@ -8,7 +8,7 @@ import { PlistService } from '../plist/plist-service.js';
 import type { PlistValue } from '../types.js';
 import { connectAndRelay, createUsbmux } from '../usbmux/index.js';
 
-const log = logger.getLogger('Localdown');
+const log = logger.getLogger('Lockdown');
 const LABEL = 'appium-internal';
 
 interface Device {
