@@ -6,7 +6,6 @@ import {
   upgradeSocketToTLS,
 } from '../../../lib/lockdown/index.js';
 import { PlistService } from '../../../lib/plist/plist-service.js';
-
 import { createUsbmux } from '../../../lib/usbmux/index.js';
 
 const log = logger.getLogger('TunnelService');
