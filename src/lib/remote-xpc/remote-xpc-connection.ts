@@ -15,16 +15,16 @@ interface ServicesResponse {
 }
 
 class RemoteXpcConnection {
-  private readonly address: [string, number];
-  private socket: net.Socket | undefined;
-  private handshake: Handshake | undefined;
+  private readonly _address: [string, number];
+  private _socket: net.Socket | undefined;
+  private _handshake: Handshake | undefined;
   private _isConnected: boolean;
   private _services: Service[] | undefined;
 
   constructor(address: [string, number]) {
-    this.address = address;
-    this.socket = undefined;
-    this.handshake = undefined;
+    this._address = address;
+    this._socket = undefined;
+    this._handshake = undefined;
     this._isConnected = false;
     this._services = undefined;
   }
@@ -40,23 +40,23 @@ class RemoteXpcConnection {
 
     return new Promise((resolve, reject) => {
       try {
-        this.socket = net.connect({
-          host: this.address[0],
-          port: this.address[1],
+        this._socket = net.connect({
+          host: this._address[0],
+          port: this._address[1],
           family: 6,
         });
 
-        this.socket.setNoDelay(true);
-        this.socket.setKeepAlive(true);
+        this._socket.setNoDelay(true);
+        this._socket.setKeepAlive(true);
 
-        this.socket.once('error', (error) => {
+        this._socket.once('error', (error) => {
           log.error('Connection error:', error);
           this._isConnected = false;
           reject(error);
         });
 
         // Handle incoming data
-        this.socket.on('data', (data) => {
+        this._socket.on('data', (data) => {
           if (Buffer.isBuffer(data) || typeof data === 'string') {
             const buffer = Buffer.isBuffer(data)
               ? data
@@ -71,19 +71,19 @@ class RemoteXpcConnection {
           }
         });
 
-        this.socket.on('close', () => {
+        this._socket.on('close', () => {
           log.info('Socket closed');
           this._isConnected = false;
         });
 
-        this.socket.once('connect', async () => {
+        this._socket.once('connect', async () => {
           try {
             this._isConnected = true;
-            if (this.socket) {
-              this.handshake = new Handshake(this.socket);
+            if (this._socket) {
+              this._handshake = new Handshake(this._socket);
               // Once handshake is successful we can get
               // peer-info and get ports for lockdown in RSD
-              await this.handshake.perform();
+              await this._handshake.perform();
             }
           } catch (error) {
             log.error('Handshake failed:', error);
@@ -102,12 +102,12 @@ class RemoteXpcConnection {
    * Close the connection
    */
   async close(): Promise<void> {
-    if (this.socket) {
+    if (this._socket) {
       return new Promise((resolve) => {
-        this.socket!.end(() => {
-          this.socket = undefined;
+        this._socket!.end(() => {
+          this._socket = undefined;
           this._isConnected = false;
-          this.handshake = undefined;
+          this._handshake = undefined;
           this._services = undefined;
           resolve();
         });

@@ -29,13 +29,13 @@ export class PlistService {
    * @returns The socket used by this service
    */
   public getSocket(): Socket | TLSSocket {
-    return this.socket;
+    return this._socket;
   }
-  private readonly socket: Socket | TLSSocket;
-  private readonly splitter: LengthBasedSplitter;
-  private readonly decoder: PlistServiceDecoder;
-  private encoder: PlistServiceEncoder;
-  private messageQueue: PlistMessage[];
+  private readonly _socket: Socket | TLSSocket;
+  private readonly _splitter: LengthBasedSplitter;
+  private readonly _decoder: PlistServiceDecoder;
+  private _encoder: PlistServiceEncoder;
+  private _messageQueue: PlistMessage[];
 
   /**
    * Creates a new PlistService instance
@@ -43,22 +43,22 @@ export class PlistService {
    * @param options Configuration options
    */
   constructor(socket: Socket, options: PlistServiceOptions = {}) {
-    this.socket = socket;
+    this._socket = socket;
 
     // Set up transformers
-    this.splitter = new LengthBasedSplitter({
+    this._splitter = new LengthBasedSplitter({
       maxFrameLength: options.maxFrameLength ?? 10 * 1024 * 1024, // Default to 10MB
     });
-    this.decoder = new PlistServiceDecoder();
-    this.encoder = new PlistServiceEncoder();
+    this._decoder = new PlistServiceDecoder();
+    this._encoder = new PlistServiceEncoder();
 
     // Set up the pipeline
     this.setupPipeline();
 
     // Message queue for async receiving
-    this.messageQueue = [];
-    this.decoder.on('data', (data: PlistMessage) =>
-      this.messageQueue.push(data),
+    this._messageQueue = [];
+    this._decoder.on('data', (data: PlistMessage) =>
+      this._messageQueue.push(data),
     );
 
     // Handle errors
@@ -88,7 +88,7 @@ export class PlistService {
     if (!data) {
       throw new Error('Cannot send null or undefined data');
     }
-    this.encoder.write(data);
+    this._encoder.write(data);
   }
 
   /**
@@ -100,14 +100,14 @@ export class PlistService {
   public async receivePlist(timeout = 5000): Promise<PlistMessage> {
     return new Promise<PlistMessage>((resolve, reject) => {
       // Check if we already have a message
-      const message = this.messageQueue.shift();
+      const message = this._messageQueue.shift();
       if (message) {
         return resolve(message);
       }
 
       // Set up a check interval
       const checkInterval = setInterval(() => {
-        const message = this.messageQueue.shift();
+        const message = this._messageQueue.shift();
         if (message) {
           clearInterval(checkInterval);
           clearTimeout(timeoutId);
@@ -130,7 +130,7 @@ export class PlistService {
    */
   public close(): void {
     try {
-      this.socket.end();
+      this._socket.end();
     } catch (error) {
       log.error(
         'Error closing socket:',
@@ -143,19 +143,19 @@ export class PlistService {
    * Sets up the data pipeline between socket and transformers
    */
   private setupPipeline(): void {
-    this.socket.pipe(this.splitter);
-    this.splitter.pipe(this.decoder);
-    this.encoder.pipe(this.socket);
+    this._socket.pipe(this._splitter);
+    this._splitter.pipe(this._decoder);
+    this._encoder.pipe(this._socket);
   }
 
   /**
    * Sets up error handlers for socket and transformers
    */
   private setupErrorHandlers(): void {
-    this.socket.on('error', this.handleError.bind(this));
-    this.encoder.on('error', this.handleError.bind(this));
-    this.decoder.on('error', this.handleError.bind(this));
-    this.splitter.on('error', this.handleError.bind(this));
+    this._socket.on('error', this.handleError.bind(this));
+    this._encoder.on('error', this.handleError.bind(this));
+    this._decoder.on('error', this.handleError.bind(this));
+    this._splitter.on('error', this.handleError.bind(this));
   }
 
   /**

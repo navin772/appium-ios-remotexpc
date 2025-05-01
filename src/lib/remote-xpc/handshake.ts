@@ -12,12 +12,12 @@ import { type XPCMessage, encodeMessage } from './xpc-protocol.js';
 
 class Handshake {
   private _socket: Socket;
-  private readonly nextMessageId: { [channel: number]: number };
+  private readonly _nextMessageId: { [channel: number]: number };
 
   constructor(socket: Socket) {
     // Socket must be non-null here
     this._socket = socket;
-    this.nextMessageId = {
+    this._nextMessageId = {
       [Http2Constants.ROOT_CHANNEL]: 0,
       [Http2Constants.REPLY_CHANNEL]: 0,
     };
@@ -39,7 +39,7 @@ class Handshake {
     const flags: number = XpcConstants.XPC_FLAGS_ALWAYS_SET;
     const requestMessage: XPCMessage = {
       flags,
-      id: BigInt(this.nextMessageId[Http2Constants.ROOT_CHANNEL]),
+      id: BigInt(this._nextMessageId[Http2Constants.ROOT_CHANNEL]),
       body: data,
     };
 
@@ -103,7 +103,7 @@ class Handshake {
       [],
     );
     await this.sendFrame(dataFrame.serialize());
-    this.nextMessageId[Http2Constants.ROOT_CHANNEL]++;
+    this._nextMessageId[Http2Constants.ROOT_CHANNEL]++;
 
     // Step 7: Send a HEADERS frame on stream 3.
     const headersFrameReply: HeadersFrame = new HeadersFrame(
@@ -128,7 +128,7 @@ class Handshake {
       [],
     );
     await this.sendFrame(replyDataFrame.serialize());
-    this.nextMessageId[Http2Constants.REPLY_CHANNEL]++;
+    this._nextMessageId[Http2Constants.REPLY_CHANNEL]++;
 
     // Step 9: Send SETTINGS ACK frame.
     const ackFrame: SettingsFrame = new SettingsFrame(0, null, ['ACK']);

@@ -18,7 +18,7 @@ export interface DecodedUsbmux {
 }
 
 export class UsbmuxDecoder extends Transform {
-  private buffer: Buffer = Buffer.alloc(0);
+  private _buffer: Buffer = Buffer.alloc(0);
 
   constructor() {
     super({ objectMode: true });
@@ -30,24 +30,24 @@ export class UsbmuxDecoder extends Transform {
     callback: TransformCallback,
   ): void {
     // Append the new chunk to the internal buffer
-    this.buffer = Buffer.concat([this.buffer, chunk]);
+    this._buffer = Buffer.concat([this._buffer, chunk]);
 
     // Process complete messages in the buffer
-    while (this.buffer.length >= HEADER_LENGTH) {
+    while (this._buffer.length >= HEADER_LENGTH) {
       // Read header length field (total length of the message)
-      const totalLength = this.buffer.readUInt32LE(0);
+      const totalLength = this._buffer.readUInt32LE(0);
 
       // Check if we have received the full message
-      if (this.buffer.length < totalLength) {
+      if (this._buffer.length < totalLength) {
         break; // Wait for more data
       }
 
       // Extract the full message
-      const message = this.buffer.slice(0, totalLength);
+      const message = this._buffer.slice(0, totalLength);
       this._decode(message);
 
       // Remove the processed message from the buffer
-      this.buffer = this.buffer.slice(totalLength);
+      this._buffer = this._buffer.slice(totalLength);
     }
     callback();
   }

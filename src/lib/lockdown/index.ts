@@ -119,14 +119,14 @@ export function upgradeSocketToTLS(
 }
 
 export class LockdownService extends BasePlistService {
-  private readonly udid: string;
+  private readonly _udid: string;
   private _plistAfterTLS?: PlistService;
   private _isTLS = false;
   public _tlsUpgrade?: Promise<void>;
 
   constructor(socket: Socket, udid: string, autoSecure = true) {
     super(socket);
-    this.udid = udid;
+    this._udid = udid;
     log.info(`LockdownService initialized for UDID: ${udid}`);
     if (autoSecure) {
       this._tlsUpgrade = this.tryUpgradeToTLS().catch((err) =>
@@ -222,9 +222,9 @@ export class LockdownService extends BasePlistService {
 
   private async getPairRecord(): Promise<PairRecord | null> {
     try {
-      log.info('Retrieving pair record for UDID:', this.udid);
+      log.info('Retrieving pair record for UDID:', this._udid);
       const usbmux = await createUsbmux();
-      const record = await usbmux.readPairRecord(this.udid);
+      const record = await usbmux.readPairRecord(this._udid);
       await usbmux.close();
       if (!record?.HostCertificate || !record.HostPrivateKey) {
         log.error('Pair record missing certificate or key');
