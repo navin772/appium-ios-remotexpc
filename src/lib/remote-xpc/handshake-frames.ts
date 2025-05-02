@@ -28,7 +28,7 @@ class Struct {
       } else if (t === 'L') {
         total += 4;
       } else {
-        throw new Error('Unsupported type: ' + t);
+        throw new TypeError('Unsupported type: ' + t);
       }
     }
     return total;
@@ -36,7 +36,7 @@ class Struct {
 
   pack(...values: number[]): Buffer {
     if (values.length !== this.types.length) {
-      throw new Error('Incorrect number of values to pack');
+      throw new TypeError('Incorrect number of values to pack');
     }
     const buf = Buffer.alloc(this.byteLength());
     let offset = 0;
@@ -52,7 +52,7 @@ class Struct {
         buf.writeUInt32BE(v, offset);
         offset += 4;
       } else {
-        throw new Error('Unsupported type: ' + t);
+        throw new TypeError('Unsupported type: ' + t);
       }
     }
     return buf;

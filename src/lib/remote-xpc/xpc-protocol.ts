@@ -208,7 +208,7 @@ export function decodeMessage(buffer: Buffer): XPCMessage {
     decodedValue === null ||
     Array.isArray(decodedValue)
   ) {
-    throw new Error('Expected dictionary as message body');
+    throw new TypeError('Expected dictionary as message body');
   }
 
   return { flags, id: msgId, body: decodedValue as XPCDictionary };
@@ -314,7 +314,7 @@ function encodeObject(writer: Writer, value: XPCValue): void {
     encodeDictionary(writer, value);
     return;
   }
-  throw new Error('Unsupported type: ' + typeof value);
+  throw new TypeError('Unsupported type: ' + typeof value);
 }
 
 /**
@@ -374,7 +374,7 @@ function decodeObject(reader: Reader): XPCValue {
       return decodeDictionary(reader);
     // Note: fileTransfer type is not implemented here.
     default:
-      throw new Error(`Unsupported xpc type: 0x${type.toString(16)}`);
+      throw new TypeError(`Unsupported xpc type: 0x${type.toString(16)}`);
   }
 }
 

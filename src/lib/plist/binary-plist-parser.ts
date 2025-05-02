@@ -267,7 +267,7 @@ class BinaryPlistParser {
       if (objInfo === 0x0f) {
         const intType = this._buffer.readUInt8(startOffset) & 0xf0;
         if (intType !== BPLIST_TYPE.INT) {
-          throw new Error(
+          throw new TypeError(
             `Expected integer type for length at offset ${startOffset}`,
           );
         }
@@ -341,7 +341,7 @@ class BinaryPlistParser {
         return this._createTempDict(objLength, startOffset);
 
       default:
-        throw new Error(
+        throw new TypeError(
           `Unsupported binary plist object type: ${objType.toString(16)}`,
         );
     }
@@ -462,7 +462,7 @@ class BinaryPlistParser {
       const value = this._objectTable[valueRef];
 
       if (typeof key !== 'string') {
-        throw new Error(`Dictionary key must be a string, got ${typeof key}`);
+        throw new TypeError(`Dictionary key must be a string, got ${typeof key}`);
       }
 
       // Ensure we're not adding a TempObject to the dictionary
