@@ -462,7 +462,9 @@ class BinaryPlistParser {
       const value = this._objectTable[valueRef];
 
       if (typeof key !== 'string') {
-        throw new TypeError(`Dictionary key must be a string, got ${typeof key}`);
+        throw new TypeError(
+          `Dictionary key must be a string, got ${typeof key}`,
+        );
       }
 
       // Ensure we're not adding a TempObject to the dictionary

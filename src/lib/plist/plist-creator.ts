@@ -1,5 +1,3 @@
-import type { PlistDictionary, PlistValue } from '../types.js';
-
 /**
  * Creates an XML plist string from a JavaScript object
  * @param obj - The JavaScript object to convert

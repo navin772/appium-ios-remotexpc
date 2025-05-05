@@ -1,6 +1,6 @@
 import { DOMParser, Element, Node } from '@xmldom/xmldom';
 
-import type { PlistArray, PlistDictionary, PlistValue } from '../types.js';
+import type { PlistArray, PlistDictionary } from '../types.js';
 
 /**
  * Parses an XML plist string into a JavaScript object
