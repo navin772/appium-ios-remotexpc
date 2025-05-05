@@ -31,61 +31,6 @@ interface LockdownServiceInfo {
 }
 
 /**
- * Simple interactive UDID selector using arrow keys, defaults if only one device
- */
-const promptUserToSelectUDID = async (devices: Device[]): Promise<string> => {
-  if (devices.length === 1) {
-    const single = devices[0].Properties.SerialNumber;
-    log.info(`Only one device found, selecting UDID: ${single}`);
-    return single;
-  }
-
-  return await new Promise<string>((resolve) => {
-    let selected = 0;
-    const render = () => {
-      // eslint-disable-next-line no-console
-      console.clear();
-      log.info('Select a device UDID:');
-      devices.forEach((d, i) => {
-        const prefix = i === selected ? '>' : ' ';
-        log.info(
-          `${prefix} ${d.Properties.SerialNumber} - ${d.Properties.ConnectionType}`,
-        );
-      });
-    };
-
-    process.stdin.setRawMode(true);
-    process.stdin.resume();
-    process.stdin.setEncoding('utf8');
-
-    const onKey = (key: string) => {
-      if (key === '\u0003') {
-        log.info('User canceled selection (Ctrl+C)');
-        process.exit();
-      } else if (key === '\u001B[A') {
-        selected = (selected - 1 + devices.length) % devices.length;
-        render();
-      } else if (key === '\u001B[B') {
-        selected = (selected + 1) % devices.length;
-        render();
-      } else if (key === '\r') {
-        process.stdin.setRawMode(false);
-        process.stdin.pause();
-        process.stdin.removeListener('data', onKey);
-        const udid = devices[selected].Properties.SerialNumber;
-        // eslint-disable-next-line no-console
-        console.clear();
-        log.info(`Selected UDID: ${udid}`);
-        resolve(udid);
-      }
-    };
-
-    render();
-    process.stdin.on('data', onKey);
-  });
-};
-
-/**
  * Upgrades a socket to TLS
  */
 export function upgradeSocketToTLS(
@@ -240,10 +185,10 @@ export class LockdownService extends BasePlistService {
 }
 
 /**
- * Creates a LockdownService, optionally prompting for UDID
+ * Creates a LockdownService using the provided UDID
  */
 export async function createLockdownServiceByUDID(
-  udid?: string,
+  udid: string,
   port = 62078,
   autoSecure = true,
 ): Promise<LockdownServiceInfo> {
@@ -261,16 +206,13 @@ export async function createLockdownServiceByUDID(
     throw new Error('No devices connected');
   }
 
-  // Determine UDID: use provided if valid, otherwise prompt
-  let selectedUDID: string;
-  if (udid && devices.some((d) => d.Properties.SerialNumber === udid)) {
-    log.info(`Using provided UDID: ${udid}`);
-    selectedUDID = udid;
-  } else {
-    selectedUDID = await promptUserToSelectUDID(devices);
+  // Verify the provided UDID exists in connected devices
+  if (!devices.some((d) => d.Properties.SerialNumber === udid)) {
+    throw new Error(`Provided UDID ${udid} not found among connected devices`);
   }
 
-  log.info('Selected UDID:', selectedUDID);
+  const selectedUDID = udid;
+  log.info('Using UDID:', selectedUDID);
 
   const device = devices.find(
     (d) => d.Properties.SerialNumber === selectedUDID,
