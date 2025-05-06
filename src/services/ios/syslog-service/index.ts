@@ -65,7 +65,7 @@ class SyslogService {
     };
 
     const response = await conn.sendPlistRequest(request);
-    log.info('Syslog capture started:', response);
+    log.info(`Syslog capture started: ${response}`);
   }
 
   async restart(Service: Service) {
@@ -76,9 +76,9 @@ class SyslogService {
       const request = { Request: 'Restart' };
       // Send the restart request.
       const res = await conn.sendPlistRequest(request);
-      log.info('Restart response:', res);
+      log.info(`Restart response: ${res}`);
     } catch (error) {
-      log.error('Error during restart:', error);
+      log.error(`Error during restart: ${error}`);
     }
   }
 
@@ -92,21 +92,20 @@ class SyslogService {
         // Filter packets by checking if they contain printable text
         if (this.isMostlyPrintable(packet.payload)) {
           log.info('Received syslog-like TCP packet:');
-          log.info('  Source:', packet.src);
-          log.info('  Destination:', packet.dst);
-          log.info('  Source port:', packet.sourcePort);
-          log.info('  Destination port:', packet.destPort);
-          log.info('  Payload length:', packet.payload.length);
+          log.info(`  Source: ${packet.src}`);
+          log.info(`  Destination: ${packet.dst}`);
+          log.info(`  Source port: ${packet.sourcePort}`);
+          log.info(`  Destination port: ${packet.destPort}`);
+          log.info(`  Payload length: ${packet.payload.length}`);
           log.info(
-            '  Message:',
-            packet.payload.toString().replace(/[^\x20-\x7E]/g, ''),
+            `  Message: ${packet.payload.toString().replace(/[^\x20-\x7E]/g, '')}`,
           );
         } else {
           log.info('TCP packet not mostly printable, ignoring.');
         }
       } else if (packet.protocol === 'UDP') {
         // Process UDP packets if needed
-        log.info('Received UDP packet (not filtered here):', packet);
+        log.info(`Received UDP packet (not filtered here): ${packet}`);
       }
     });
   }
@@ -172,7 +171,7 @@ class SyslogService {
     };
 
     const response = await connection.sendPlistRequest(checkin);
-    log.info('Service check-in response:', response);
+    log.info(`Service check-in response: ${response}`);
     return connection;
   }
 }

@@ -85,7 +85,7 @@ async function ensureRecordsDirectoryExists(): Promise<void> {
   try {
     await fs.promises.mkdir(RECORDS_DIR, { recursive: true, mode: 0o777 });
   } catch (error) {
-    log.error(`Failed to create directory ${RECORDS_DIR}:`, error);
+    log.error(`Failed to create directory ${RECORDS_DIR}: ${error}`);
     throw error;
   }
 }
@@ -111,7 +111,7 @@ export async function savePairRecord(
     );
     log.info(`Pair record saved: ${recordPath}`);
   } catch (error) {
-    log.error(`Failed to save pair record for ${udid}:`, error);
+    log.error(`Failed to save pair record for ${udid}: ${error}`);
     throw error;
   }
 }
@@ -132,7 +132,7 @@ export async function getPairRecord(udid: string): Promise<PairRecord | null> {
       return null;
     }
 
-    log.error(`Failed to read pair record for ${udid}:`, error);
+    log.error(`Failed to read pair record for ${udid}: ${error}`);
     throw error;
   }
 }

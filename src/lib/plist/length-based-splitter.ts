@@ -83,7 +83,7 @@ export class LengthBasedSplitter extends Transform {
       // Process as many complete messages as possible for binary data
       this.processBinaryData(callback);
     } catch (err) {
-      log.error('Unexpected error in LengthBasedSplitter:', err);
+      log.error(`Unexpected error in LengthBasedSplitter: ${err}`);
       // Don't fail the transform - just log the error and continue
       callback();
     }
@@ -227,7 +227,7 @@ export class LengthBasedSplitter extends Transform {
         // Remove the processed message from the buffer
         this.buffer = this.buffer.slice(totalLength);
       } catch (extractError) {
-        log.error('Error extracting message:', extractError);
+        log.error(`Error extracting message: ${extractError}`);
         // Skip this problematic message - move forward by 1 byte and try again
         this.buffer = this.buffer.slice(1);
       }

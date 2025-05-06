@@ -64,7 +64,7 @@ class DiagnosticsService {
       if (!response || !Array.isArray(response) || response.length === 0) {
         throw new Error('Invalid response from MobileGestalt');
       }
-      log.info('response', response);
+      log.info(`MobileGestalt response: ${response}`);
       const responseObj = response[0];
 
       // Check if MobileGestalt is deprecated (iOS >= 17.4)
@@ -74,7 +74,7 @@ class DiagnosticsService {
       ) {
         throw new Error('MobileGestalt deprecated (iOS >= 17.4)');
       }
-      log.info('responseObj', responseObj);
+      log.info(`MobileGestalt response object: ${responseObj}`);
       // Check for success
       if (
         responseObj.Status !== 'Success' ||
@@ -89,7 +89,7 @@ class DiagnosticsService {
 
       return result;
     } catch (error) {
-      log.error('Error querying MobileGestalt:', error);
+      log.error(`Error querying MobileGestalt: ${error}`);
       throw error;
     }
   }
@@ -116,7 +116,7 @@ class DiagnosticsService {
 
       // Send the request
       const response = await conn.sendPlistRequest(request);
-      log.info('Restart response:', response);
+      log.info(`Restart response: ${response}`);
 
       // Ensure we return a non-null object
       if (!response || !Array.isArray(response) || response.length === 0) {
@@ -125,7 +125,7 @@ class DiagnosticsService {
 
       return response[0] || {};
     } catch (error) {
-      log.error('Error restarting device:', error);
+      log.error(`Error restarting device: ${error}`);
       throw error;
     }
   }
@@ -152,7 +152,7 @@ class DiagnosticsService {
 
       // Send the request
       const response = await conn.sendPlistRequest(request);
-      log.info('Shutdown response:', response);
+      log.info(`Shutdown response: ${response}`);
 
       // Ensure we return a non-null object
       if (!response || !Array.isArray(response) || response.length === 0) {
@@ -161,7 +161,7 @@ class DiagnosticsService {
 
       return response[0] || {};
     } catch (error) {
-      log.error('Error shutting down device:', error);
+      log.error(`Error shutting down device: ${error}`);
       throw error;
     }
   }
@@ -188,7 +188,7 @@ class DiagnosticsService {
 
       // Send the request
       const response = await conn.sendPlistRequest(request);
-      log.info('Sleep response:', response);
+      log.info(`Sleep response: ${response}`);
 
       // Ensure we return a non-null object
       if (!response || !Array.isArray(response) || response.length === 0) {
@@ -197,7 +197,7 @@ class DiagnosticsService {
 
       return response[0] || {};
     } catch (error) {
-      log.error('Error putting device to sleep:', error);
+      log.error(`Error putting device to sleep: ${error}`);
       throw error;
     }
   }
@@ -239,7 +239,7 @@ class DiagnosticsService {
 
       // Send the request
       const response = await conn.sendPlistRequest(request);
-      log.info('IORegistry response:', response);
+      log.info(`IORegistry response: ${response}`);
       // Ensure we have a valid response
       if (!response || !Array.isArray(response) || response.length === 0) {
         throw new Error('Invalid response from IORegistry');
@@ -247,7 +247,7 @@ class DiagnosticsService {
 
       return response || {};
     } catch (error) {
-      log.error('Error querying IORegistry:', error);
+      log.error(`Error querying IORegistry: ${error}`);
       throw error;
     }
   }
@@ -281,7 +281,7 @@ class DiagnosticsService {
     };
 
     const response = await connection.sendPlistRequest(checkin);
-    log.info('Service check-in response:', response);
+    log.info(`Service check-in response: ${response}`);
     return connection;
   }
 }

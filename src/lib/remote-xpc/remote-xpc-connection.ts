@@ -50,7 +50,7 @@ class RemoteXpcConnection {
         this._socket.setKeepAlive(true);
 
         this._socket.once('error', (error) => {
-          log.error('Connection error:', error);
+          log.error(`Connection error: ${error}`);
           this._isConnected = false;
           reject(error);
         });
@@ -86,13 +86,13 @@ class RemoteXpcConnection {
               await this._handshake.perform();
             }
           } catch (error) {
-            log.error('Handshake failed:', error);
+            log.error(`Handshake failed: ${error}`);
             await this.close();
             reject(error);
           }
         });
       } catch (error) {
-        log.error('Failed to create connection:', error);
+        log.error(`Failed to create connection: ${error}`);
         reject(error);
       }
     });

@@ -53,11 +53,11 @@ export function upgradeSocketToTLS(
       },
     );
     secure.on('error', (err) => {
-      log.error('TLS socket error:', err);
+      log.error(`TLS socket error: ${err}`);
       reject(err);
     });
     socket.on('error', (err) => {
-      log.error('Underlying socket error during TLS:', err);
+      log.error(`Underlying socket error during TLS: ${err}`);
       reject(err);
     });
   });
@@ -75,13 +75,13 @@ export class LockdownService extends BasePlistService {
     log.info(`LockdownService initialized for UDID: ${udid}`);
     if (autoSecure) {
       this._tlsUpgrade = this.tryUpgradeToTLS().catch((err) =>
-        log.warn('Auto TLS upgrade failed:', err.message),
+        log.warn(`Auto TLS upgrade failed: ${err.message}`),
       );
     }
   }
 
   async startSession(hostID: string, systemBUID: string, timeout = 5000) {
-    log.info('Starting lockdown session with HostID:', hostID);
+    log.info(`Starting lockdown session with HostID: ${hostID}`);
     const res = await this.sendAndReceive(
       {
         Label: LABEL,
@@ -92,7 +92,7 @@ export class LockdownService extends BasePlistService {
       timeout,
     );
     if (res.Request === 'StartSession' && res.SessionID) {
-      log.info('Lockdown session started, SessionID:', res.SessionID);
+      log.info(`Lockdown session started, SessionID: ${res.SessionID}`);
       return {
         sessionID: res.SessionID,
         enableSessionSSL: res.EnableSessionSSL,
@@ -116,7 +116,7 @@ export class LockdownService extends BasePlistService {
     try {
       sess = await this.startSession(pairRecord.HostID, pairRecord.SystemBUID);
     } catch (err) {
-      log.error('Failed to start session:', err);
+      log.error(`Failed to start session: ${err}`);
       throw err;
     }
     if (!sess.enableSessionSSL) {
@@ -132,7 +132,7 @@ export class LockdownService extends BasePlistService {
       this._isTLS = true;
       log.info('Successfully upgraded connection to TLS');
     } catch (err) {
-      log.error('Failed to upgrade to TLS:', err);
+      log.error(`Failed to upgrade to TLS: ${err}`);
       throw err;
     }
   }
@@ -161,13 +161,13 @@ export class LockdownService extends BasePlistService {
         super.close();
       }
     } catch (err) {
-      log.error('Error closing socket:', err);
+      log.error(`Error or closing socket: ${err}`);
     }
   }
 
   private async getPairRecord(): Promise<PairRecord | null> {
     try {
-      log.info('Retrieving pair record for UDID:', this._udid);
+      log.info(`Retrieving pair record for UDID: ${this._udid}`);
       const usbmux = await createUsbmux();
       const record = await usbmux.readPairRecord(this._udid);
       await usbmux.close();
@@ -178,7 +178,7 @@ export class LockdownService extends BasePlistService {
       log.info('Pair record retrieved successfully');
       return record;
     } catch (err) {
-      log.error('Error getting pair record for TLS:', err);
+      log.error(`Error getting pair record for TLS: ${err}`);
       return null;
     }
   }
@@ -197,8 +197,7 @@ export async function createLockdownServiceByUDID(
 
   const devices = await usbmux.listDevices();
   log.info(
-    'Devices:',
-    devices.map((d) => d.Properties.SerialNumber),
+    `Devices: ${devices.map((d) => d.Properties.SerialNumber).join(', ')}`,
   );
 
   await usbmux.close();
@@ -212,7 +211,7 @@ export async function createLockdownServiceByUDID(
   }
 
   const selectedUDID = udid;
-  log.info('Using UDID:', selectedUDID);
+  log.info(`Using UDID: ${selectedUDID}`);
 
   const device = devices.find(
     (d) => d.Properties.SerialNumber === selectedUDID,

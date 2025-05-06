@@ -133,8 +133,7 @@ export class PlistService {
       this._socket.end();
     } catch (error) {
       log.error(
-        'Error closing socket:',
-        error instanceof Error ? error.message : String(error),
+        `Error closing socket: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }

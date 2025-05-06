@@ -506,7 +506,7 @@ export class RelayService {
       });
 
       localSocket.on('error', (err) => {
-        log.error('Local socket error:', err);
+        log.error(`Local socket error: ${err}`);
       });
     });
 
@@ -587,7 +587,7 @@ export async function connectAndRelay(
     return await relay.connect();
   } catch (error) {
     // Clean up if there's an error
-    await relay.stop().catch((err) => log.error('Error stopping relay:', err));
+    await relay.stop().catch((err) => log.error(`Error stopping relay: ${err}`));
     throw error;
   }
 }
