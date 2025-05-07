@@ -1,7 +1,7 @@
 import { logger } from '@appium/support';
 import { EventEmitter } from 'events';
 
-import ServiceConnection from '../../../service-connection.js';
+import { ServiceConnection } from '../../../service-connection.js';
 
 const log = logger.getLogger('Syslog');
 // Define interfaces for clarity
@@ -68,7 +68,12 @@ class SyslogService {
     log.info(`Syslog capture started: ${response}`);
   }
 
-  async restart(Service: Service) {
+  /**
+   * Restart the device
+   * @param Service Service information
+   * @returns Promise that resolves when the restart request is sent
+   */
+  async restart(Service: Service): Promise<void> {
     try {
       // Connect to the diagnostics service for restart.
       const conn = await this.startLockdownService(Service);

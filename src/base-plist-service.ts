@@ -37,6 +37,7 @@ export abstract class BasePlistService {
 
   /**
    * Gets the PlistService instance
+   * @returns The PlistService instance
    */
   protected getPlistService(): PlistService {
     return this._plistService;

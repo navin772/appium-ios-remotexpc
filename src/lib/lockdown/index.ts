@@ -5,7 +5,7 @@ import tls, { type ConnectionOptions, TLSSocket } from 'tls';
 import { BasePlistService } from '../../base-plist-service.js';
 import { type PairRecord } from '../pair-record/index.js';
 import { PlistService } from '../plist/plist-service.js';
-import type { PlistValue } from '../types.js';
+import type { PlistMessage, PlistValue } from '../types.js';
 import { connectAndRelay, createUsbmux } from '../usbmux/index.js';
 
 const log = logger.getLogger('Lockdown');
@@ -80,7 +80,11 @@ export class LockdownService extends BasePlistService {
     }
   }
 
-  async startSession(hostID: string, systemBUID: string, timeout = 5000) {
+  async startSession(
+    hostID: string,
+    systemBUID: string,
+    timeout = 5000,
+  ): Promise<{ sessionID: string; enableSessionSSL: boolean }> {
     log.info(`Starting lockdown session with HostID: ${hostID}`);
     const res = await this.sendAndReceive(
       {
@@ -94,8 +98,8 @@ export class LockdownService extends BasePlistService {
     if (res.Request === 'StartSession' && res.SessionID) {
       log.info(`Lockdown session started, SessionID: ${res.SessionID}`);
       return {
-        sessionID: res.SessionID,
-        enableSessionSSL: res.EnableSessionSSL,
+        sessionID: String(res.SessionID),
+        enableSessionSSL: Boolean(res.EnableSessionSSL),
       };
     }
     throw new Error(`Unexpected session data: ${JSON.stringify(res)}`);
@@ -143,14 +147,17 @@ export class LockdownService extends BasePlistService {
       : this.getPlistService().getSocket();
   }
 
-  public async sendAndReceive(msg: Record<string, PlistValue>, timeout = 5000) {
+  public async sendAndReceive(
+    msg: Record<string, PlistValue>,
+    timeout = 5000,
+  ): Promise<PlistMessage> {
     if (this._isTLS && this._plistAfterTLS) {
       return this._plistAfterTLS.sendPlistAndReceive(msg, timeout);
     }
     return this._plistService.sendPlistAndReceive(msg, timeout);
   }
 
-  public close() {
+  public close(): void {
     log.info('Closing LockdownService connections');
     try {
       // Close the TLS service if it exists

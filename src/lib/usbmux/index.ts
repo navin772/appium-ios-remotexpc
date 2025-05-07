@@ -1,6 +1,6 @@
 import { logger } from '@appium/support';
-import net, { Socket } from 'net';
-import os from 'os';
+import { Server, Socket, createConnection, createServer } from 'node:net';
+import { release } from 'node:os';
 
 import { BaseSocketService } from '../../base-socket-service.js';
 import { type PairRecord, processPlistResponse } from '../pair-record/index.js';
@@ -9,6 +9,28 @@ import { LengthBasedSplitter, parsePlist } from '../plist/index.js';
 import type { PlistDictionary } from '../types.js';
 import { type DecodedUsbmux, UsbmuxDecoder } from '../usbmux/usbmux-decoder.js';
 import { UsbmuxEncoder } from '../usbmux/usbmux-encoder.js';
+
+/**
+ * Interface for device properties
+ */
+export interface DeviceProperties {
+  ConnectionSpeed: number;
+  ConnectionType: string;
+  DeviceID: number;
+  LocationID: number;
+  ProductID: number;
+  SerialNumber: string;
+  USBSerialNumber: string;
+}
+
+/**
+ * Interface for a device
+ */
+export interface Device {
+  DeviceID: number;
+  MessageType: string;
+  Properties: DeviceProperties;
+}
 
 const log = logger.getLogger('Usbmux');
 
@@ -106,13 +128,13 @@ export async function getDefaultSocket(
 
   let socket: Socket;
   if (await fileExists(socketPath ?? '')) {
-    socket = net.createConnection(socketPath ?? '');
+    socket = createConnection(socketPath ?? '');
   } else if (
     process.platform === 'win32' ||
-    (process.platform === 'linux' && /microsoft/i.test(os.release()))
+    (process.platform === 'linux' && /microsoft/i.test(release()))
   ) {
     // Connect to usbmuxd when running on WSL1
-    socket = net.createConnection({
+    socket = createConnection({
       port: socketPort as number,
       host: socketHost as string,
     });
@@ -255,12 +277,12 @@ export class Usbmux extends BaseSocketService {
    * @param timeout - Timeout in milliseconds
    * @returns Promise that resolves with the device list
    */
-  async listDevices(timeout = 5000): Promise<any[]> {
-    const { tag, receivePromise } = this._receivePlistPromise<any[]>(
+  async listDevices(timeout = 5000): Promise<Device[]> {
+    const { tag, receivePromise } = this._receivePlistPromise<Device[]>(
       timeout,
       (data) => {
         if (data.payload.DeviceList) {
-          return data.payload.DeviceList as any[];
+          return data.payload.DeviceList as unknown as Device[];
         }
         throw new Error(`Unexpected data: ${JSON.stringify(data)}`);
       },
@@ -284,7 +306,7 @@ export class Usbmux extends BaseSocketService {
    * @param timeout - Timeout in milliseconds
    * @returns Promise that resolves with the device or undefined if not found
    */
-  async findDevice(udid: string, timeout = 5000): Promise<any | undefined> {
+  async findDevice(udid: string, timeout = 5000): Promise<Device | undefined> {
     const devices = await this.listDevices(timeout);
     return devices.find((device) => device.Properties.SerialNumber === udid);
   }
@@ -458,7 +480,7 @@ export class RelayService {
   private readonly devicePort: number;
   private readonly relayPort: number;
   private usbmuxClient: Socket | null;
-  private server: net.Server | null;
+  private server: Server | null;
 
   /**
    * Creates a new RelayService instance
@@ -492,7 +514,7 @@ export class RelayService {
     this.usbmuxClient = await usbmux.connect(this.deviceID, this.devicePort);
 
     // Set up the relay server
-    this.server = net.createServer((localSocket) => {
+    this.server = createServer((localSocket: Socket) => {
       log.info('🔌 Local client connected to relay!');
 
       // Set up the bidirectional pipe between local socket and usbmux connection
@@ -505,7 +527,7 @@ export class RelayService {
         log.info('Local connection closed (tunnel remains open).');
       });
 
-      localSocket.on('error', (err) => {
+      localSocket.on('error', (err: Error) => {
         log.error(`Local socket error: ${err}`);
       });
     });
@@ -521,7 +543,7 @@ export class RelayService {
         resolve();
       });
 
-      this.server.on('error', (err) => {
+      this.server.on('error', (err: Error) => {
         reject(err);
       });
     });
@@ -533,7 +555,7 @@ export class RelayService {
    */
   async connect(): Promise<Socket> {
     return new Promise<Socket>((resolve, reject) => {
-      const socket = net.connect(
+      const socket = createConnection(
         { host: '127.0.0.1', port: this.relayPort },
         () => {
           log.info('Connected to service via local relay.');
@@ -541,7 +563,7 @@ export class RelayService {
         },
       );
 
-      socket.on('error', (err) => {
+      socket.on('error', (err: Error) => {
         reject(err);
       });
     });

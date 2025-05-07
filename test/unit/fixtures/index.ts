@@ -1,6 +1,6 @@
 import { fs, logger } from '@appium/support';
-import net, { Server, Socket } from 'net';
-import path from 'path';
+import { Server, Socket, createConnection, createServer } from 'node:net';
+import { resolve } from 'node:path';
 
 const log = logger.getLogger('fixtures');
 
@@ -31,7 +31,7 @@ export const fixtures = {
 };
 
 function getFixturePath(file: string): string {
-  return path.resolve(__dirname, file);
+  return resolve(__dirname, file);
 }
 
 async function initFixtures(): Promise<void> {
@@ -64,13 +64,13 @@ export async function getServerWithFixtures(
   }
   const fixturesToUse = args.map((key) => fixtureContents![key]);
 
-  const server = net.createServer();
+  const server = createServer();
   server.listen();
   const address = server.address();
   if (!address || typeof address === 'string') {
     throw new Error('Invalid server address');
   }
-  const socket = net.connect(address.port);
+  const socket = createConnection(address.port);
   server.on('connection', function (socket) {
     let i = 0;
     socket.on('data', function () {

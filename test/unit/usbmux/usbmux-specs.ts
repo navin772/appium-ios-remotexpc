@@ -1,5 +1,5 @@
 import { expect } from 'chai';
-import { Server, Socket } from 'net';
+import { Server, Socket } from 'node:net';
 
 import { Usbmux } from '../../../src/lib/usbmux/index.js';
 import { UDID, fixtures, getServerWithFixtures } from '../fixtures/index.js';
@@ -61,6 +61,9 @@ describe('usbmux', function () {
     usbmux = new Usbmux(socket);
 
     const device = await usbmux.findDevice(UDID);
-    device.Properties.SerialNumber.should.be.equal(UDID);
+    expect(device).to.not.be.undefined;
+    if (device) {
+      device.Properties.SerialNumber.should.be.equal(UDID);
+    }
   });
 });

@@ -62,6 +62,7 @@ export class ServiceConnection extends BasePlistService {
 
   /**
    * Gets the underlying socket
+   * @returns The socket used by this service
    */
   getSocket(): net.Socket {
     return this.getPlistService().getSocket() as net.Socket;

@@ -1,7 +1,7 @@
 import { logger } from '@appium/support';
 
 import type { PlistDictionary } from '../../../lib/types.js';
-import ServiceConnection from '../../../service-connection.js';
+import { ServiceConnection } from '../../../service-connection.js';
 // Import MobileGestaltKeys directly to avoid module resolution issues
 import { MobileGestaltKeys } from './keys.js';
 

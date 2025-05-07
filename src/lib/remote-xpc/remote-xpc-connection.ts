@@ -118,6 +118,7 @@ class RemoteXpcConnection {
 
   /**
    * Get the list of available services
+   * @returns Array of available services
    */
   getServices(): Service[] {
     if (!this._services) {
@@ -128,6 +129,7 @@ class RemoteXpcConnection {
 
   /**
    * List all available services
+   * @returns Array of all available services
    */
   listAllServices(): Service[] {
     return this.getServices();
@@ -153,6 +155,8 @@ class RemoteXpcConnection {
 
 /**
  * Extract services from the response
+ * @param response The response string to parse
+ * @returns Object containing the extracted services
  */
 function extractServices(response: string): ServicesResponse {
   const regex = /com\.apple(?:\.[\w-]+)+|Port[^0-9]*(\d+)/g;

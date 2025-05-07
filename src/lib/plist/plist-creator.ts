@@ -3,8 +3,10 @@
  * @param obj - The JavaScript object to convert
  * @returns - XML plist string
  */
-export function createPlist(obj: Record<string, any>): string {
-  function convert(value: any): string {
+import type { PlistDictionary, PlistValue } from '../types.js';
+
+export function createPlist(obj: PlistDictionary): string {
+  function convert(value: PlistValue): string {
     if (typeof value === 'number') {
       return `<integer>${value}</integer>`;
     }
