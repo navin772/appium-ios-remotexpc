@@ -127,18 +127,13 @@ export class LockdownService extends BasePlistService {
       log.info('Device did not request TLS upgrade. Continuing unencrypted.');
       return;
     }
-    try {
-      const tlsSocket = await upgradeSocketToTLS(this.getSocket() as Socket, {
-        cert: pairRecord.HostCertificate,
-        key: pairRecord.HostPrivateKey,
-      });
-      this._plistAfterTLS = new PlistService(tlsSocket);
-      this._isTLS = true;
-      log.info('Successfully upgraded connection to TLS');
-    } catch (err) {
-      log.error(`Failed to upgrade to TLS: ${err}`);
-      throw err;
-    }
+    const tlsSocket = await upgradeSocketToTLS(this.getSocket() as Socket, {
+      cert: pairRecord.HostCertificate,
+      key: pairRecord.HostPrivateKey,
+    });
+    this._plistAfterTLS = new PlistService(tlsSocket);
+    this._isTLS = true;
+    log.info('Successfully upgraded connection to TLS');
   }
 
   public getSocket(): Socket | TLSSocket {

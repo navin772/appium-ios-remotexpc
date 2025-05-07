@@ -96,15 +96,15 @@ class SyslogService {
       if (packet.protocol === 'TCP') {
         // Filter packets by checking if they contain printable text
         if (this.isMostlyPrintable(packet.payload)) {
-      log.debug('Received syslog-like TCP packet:');
-      log.debug(`  Source: ${packet.src}`);
-      log.debug(`  Destination: ${packet.dst}`);
-      log.debug(`  Source port: ${packet.sourcePort}`);
-      log.debug(`  Destination port: ${packet.destPort}`);
-      log.debug(`  Payload length: ${packet.payload.length}`);
-      log.debug(
-        `  Message: ${packet.payload.toString().replace(/[^\x20-\x7E]/g, '')}`,
-      );
+          log.debug('Received syslog-like TCP packet:');
+          log.debug(`  Source: ${packet.src}`);
+          log.debug(`  Destination: ${packet.dst}`);
+          log.debug(`  Source port: ${packet.sourcePort}`);
+          log.debug(`  Destination port: ${packet.destPort}`);
+          log.debug(`  Payload length: ${packet.payload.length}`);
+          log.debug(
+            `  Message: ${packet.payload.toString().replace(/[^\x20-\x7E]/g, '')}`,
+          );
         } else {
           log.debug('TCP packet not mostly printable, ignoring.');
         }
