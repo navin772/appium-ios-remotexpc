@@ -515,7 +515,7 @@ export class RelayService {
 
     // Set up the relay server
     this.server = createServer((localSocket: Socket) => {
-      log.info('🔌 Local client connected to relay!');
+      log.debug('🔌 Local client connected to relay!');
 
       // Set up the bidirectional pipe between local socket and usbmux connection
       if (this.usbmuxClient) {
@@ -524,7 +524,7 @@ export class RelayService {
 
       // Handle socket events
       localSocket.on('close', () => {
-        log.info('Local connection closed (tunnel remains open).');
+        log.debug('Local connection closed (tunnel remains open).');
       });
 
       localSocket.on('error', (err: Error) => {
@@ -558,7 +558,7 @@ export class RelayService {
       const socket = createConnection(
         { host: '127.0.0.1', port: this.relayPort },
         () => {
-          log.info('Connected to service via local relay.');
+          log.debug('Connected to service via local relay.');
           resolve(socket);
         },
       );

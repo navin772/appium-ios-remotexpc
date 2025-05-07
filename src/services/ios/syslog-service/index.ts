@@ -96,21 +96,21 @@ class SyslogService {
       if (packet.protocol === 'TCP') {
         // Filter packets by checking if they contain printable text
         if (this.isMostlyPrintable(packet.payload)) {
-          log.info('Received syslog-like TCP packet:');
-          log.info(`  Source: ${packet.src}`);
-          log.info(`  Destination: ${packet.dst}`);
-          log.info(`  Source port: ${packet.sourcePort}`);
-          log.info(`  Destination port: ${packet.destPort}`);
-          log.info(`  Payload length: ${packet.payload.length}`);
-          log.info(
-            `  Message: ${packet.payload.toString().replace(/[^\x20-\x7E]/g, '')}`,
-          );
+      log.debug('Received syslog-like TCP packet:');
+      log.debug(`  Source: ${packet.src}`);
+      log.debug(`  Destination: ${packet.dst}`);
+      log.debug(`  Source port: ${packet.sourcePort}`);
+      log.debug(`  Destination port: ${packet.destPort}`);
+      log.debug(`  Payload length: ${packet.payload.length}`);
+      log.debug(
+        `  Message: ${packet.payload.toString().replace(/[^\x20-\x7E]/g, '')}`,
+      );
         } else {
-          log.info('TCP packet not mostly printable, ignoring.');
+          log.debug('TCP packet not mostly printable, ignoring.');
         }
       } else if (packet.protocol === 'UDP') {
         // Process UDP packets if needed
-        log.info(`Received UDP packet (not filtered here): ${packet}`);
+        log.debug(`Received UDP packet (not filtered here): ${packet}`);
       }
     });
   }
@@ -138,7 +138,7 @@ class SyslogService {
 
       return printableCount / str.length > 0.5;
     } catch (error) {
-      log.info(error);
+      log.debug(error);
       return false;
     }
   }
@@ -176,7 +176,7 @@ class SyslogService {
     };
 
     const response = await connection.sendPlistRequest(checkin);
-    log.info(`Service check-in response: ${response}`);
+    log.debug(`Service check-in response: ${response}`);
     return connection;
   }
 }

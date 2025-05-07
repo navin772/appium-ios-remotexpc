@@ -64,7 +64,7 @@ class DiagnosticsService {
       if (!response || !Array.isArray(response) || response.length === 0) {
         throw new Error('Invalid response from MobileGestalt');
       }
-      log.info(`MobileGestalt response: ${response}`);
+      log.debug(`MobileGestalt response: ${response}`);
       const responseObj = response[0];
 
       // Check if MobileGestalt is deprecated (iOS >= 17.4)
@@ -74,7 +74,7 @@ class DiagnosticsService {
       ) {
         throw new Error('MobileGestalt deprecated (iOS >= 17.4)');
       }
-      log.info(`MobileGestalt response object: ${responseObj}`);
+      log.debug(`MobileGestalt response object: ${responseObj}`);
       // Check for success
       if (
         responseObj.Status !== 'Success' ||
@@ -116,7 +116,7 @@ class DiagnosticsService {
 
       // Send the request
       const response = await conn.sendPlistRequest(request);
-      log.info(`Restart response: ${response}`);
+      log.debug(`Restart response: ${response}`);
 
       // Ensure we return a non-null object
       if (!response || !Array.isArray(response) || response.length === 0) {
@@ -152,7 +152,7 @@ class DiagnosticsService {
 
       // Send the request
       const response = await conn.sendPlistRequest(request);
-      log.info(`Shutdown response: ${response}`);
+      log.debug(`Shutdown response: ${response}`);
 
       // Ensure we return a non-null object
       if (!response || !Array.isArray(response) || response.length === 0) {
@@ -188,7 +188,7 @@ class DiagnosticsService {
 
       // Send the request
       const response = await conn.sendPlistRequest(request);
-      log.info(`Sleep response: ${response}`);
+      log.debug(`Sleep response: ${response}`);
 
       // Ensure we return a non-null object
       if (!response || !Array.isArray(response) || response.length === 0) {
@@ -239,7 +239,7 @@ class DiagnosticsService {
 
       // Send the request
       const response = await conn.sendPlistRequest(request);
-      log.info(`IORegistry response: ${response}`);
+      log.debug(`IORegistry response: ${response}`);
       // Ensure we have a valid response
       if (!response || !Array.isArray(response) || response.length === 0) {
         throw new Error('Invalid response from IORegistry');
@@ -281,7 +281,7 @@ class DiagnosticsService {
     };
 
     const response = await connection.sendPlistRequest(checkin);
-    log.info(`Service check-in response: ${response}`);
+    log.debug(`Service check-in response: ${response}`);
     return connection;
   }
 }

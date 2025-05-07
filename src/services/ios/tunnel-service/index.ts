@@ -43,7 +43,7 @@ export async function startCoreDeviceProxy(
     throw new Error('Service didnt return a port');
   }
 
-  log.info(`Connecting to CoreDeviceProxy service on port: ${response.Port}`);
+  log.debug(`Connecting to CoreDeviceProxy service on port: ${response.Port}`);
 
   const usbmux = await createUsbmux();
 
@@ -63,7 +63,7 @@ export async function startCoreDeviceProxy(
     Number(response.Port),
   );
 
-  log.info('Socket connected to CoreDeviceProxy, upgrading to TLS...');
+  log.debug('Socket connected to CoreDeviceProxy, upgrading to TLS...');
 
   const fullTlsOptions = {
     ...tlsOptions,

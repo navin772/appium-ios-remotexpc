@@ -39,7 +39,7 @@ export function upgradeSocketToTLS(
 ): Promise<TLSSocket> {
   return new Promise((resolve, reject) => {
     socket.pause();
-    log.info('Upgrading socket to TLS...');
+    log.debug('Upgrading socket to TLS...');
     const secure = tls.connect(
       {
         socket,
@@ -85,7 +85,7 @@ export class LockdownService extends BasePlistService {
     systemBUID: string,
     timeout = 5000,
   ): Promise<{ sessionID: string; enableSessionSSL: boolean }> {
-    log.info(`Starting lockdown session with HostID: ${hostID}`);
+    log.debug(`Starting lockdown session with HostID: ${hostID}`);
     const res = await this.sendAndReceive(
       {
         Label: LABEL,
@@ -174,7 +174,7 @@ export class LockdownService extends BasePlistService {
 
   private async getPairRecord(): Promise<PairRecord | null> {
     try {
-      log.info(`Retrieving pair record for UDID: ${this._udid}`);
+      log.debug(`Retrieving pair record for UDID: ${this._udid}`);
       const usbmux = await createUsbmux();
       const record = await usbmux.readPairRecord(this._udid);
       await usbmux.close();
@@ -200,10 +200,10 @@ export async function createLockdownServiceByUDID(
   autoSecure = true,
 ): Promise<LockdownServiceInfo> {
   const usbmux = await createUsbmux();
-  log.info('Listing connected devices...');
+  log.debug('Listing connected devices...');
 
   const devices = await usbmux.listDevices();
-  log.info(
+  log.debug(
     `Devices: ${devices.map((d) => d.Properties.SerialNumber).join(', ')}`,
   );
 
@@ -231,13 +231,13 @@ export async function createLockdownServiceByUDID(
     `Found device: DeviceID=${device.DeviceID}, SerialNumber=${device.Properties.SerialNumber}, ConnectionType=${device.Properties.ConnectionType}`,
   );
 
-  log.info(`Connecting to device ${device.DeviceID} on port ${port}...`);
+  log.debug(`Connecting to device ${device.DeviceID} on port ${port}...`);
   const socket: Socket = await connectAndRelay(device.DeviceID, port);
-  log.info('Socket connected, creating LockdownService');
+  log.debug('Socket connected, creating LockdownService');
 
   const service = new LockdownService(socket, selectedUDID, autoSecure);
   if (autoSecure && service._tlsUpgrade) {
-    log.info('Waiting for TLS upgrade to complete...');
+    log.debug('Waiting for TLS upgrade to complete...');
     await service._tlsUpgrade;
   }
 
