@@ -96,30 +96,50 @@ class BinaryPlistParser {
    * @param offset - The offset to read from
    * @returns The object reference index
    */
-  private _readObjectRef(offset: number): number {
-    // Use BigInt for calculations if objectRefSize is large enough to potentially overflow
-    if (this._objectRefSize > 6) {
-      // 6 bytes = 48 bits, safely under MAX_SAFE_INTEGER
+  /**
+   * Helper method to read multi-byte integers safely, handling potential overflow
+   * @param startOffset - The offset to start reading from
+   * @param byteCount - The number of bytes to read
+   * @param valueName - Name of the value type for error messages
+   * @returns The parsed integer value
+   */
+  private _readMultiByteInteger(
+    startOffset: number,
+    byteCount: number,
+    valueName: string
+  ): number {
+    // Use BigInt for calculations if byteCount is large enough to potentially overflow
+    if (byteCount > 6) { // 6 bytes = 48 bits, safely under MAX_SAFE_INTEGER
       let result = 0n;
-      for (let i = 0; i < this._objectRefSize; i++) {
-        result = (result << 8n) | BigInt(this._buffer.readUInt8(offset + i));
+      for (let i = 0; i < byteCount; i++) {
+        result = (result << 8n) | BigInt(this._buffer.readUInt8(startOffset + i));
       }
-      // Convert back to number, with a warning if precision loss occurs
-      const numResult = Number(result);
-      if (BigInt(numResult) !== result) {
-        log.warn(
-          'Precision loss when converting object reference to Number. This may cause issues.',
+      
+      // Check if the value exceeds MAX_SAFE_INTEGER
+      if (result > BigInt(Number.MAX_SAFE_INTEGER)) {
+        throw new Error(
+          `${valueName} value ${result} exceeds MAX_SAFE_INTEGER. Cannot safely convert to number.`
         );
       }
-      return numResult;
+      
+      // Safe to convert to number without precision loss
+      return Number(result);
     } else {
       // Use regular number arithmetic for smaller values
       let result = 0;
-      for (let i = 0; i < this._objectRefSize; i++) {
-        result = (result << 8) | this._buffer.readUInt8(offset + i);
+      for (let i = 0; i < byteCount; i++) {
+        result = (result << 8) | this._buffer.readUInt8(startOffset + i);
       }
       return result;
     }
+  }
+
+  private _readObjectRef(offset: number): number {
+    return this._readMultiByteInteger(
+      offset,
+      this._objectRefSize,
+      'Object reference'
+    );
   }
 
   /**
@@ -129,31 +149,11 @@ class BinaryPlistParser {
    */
   private _readOffset(index: number): number {
     const offsetStart = this._offsetTableOffset + index * this._offsetSize;
-
-    // Use BigInt for calculations if offsetSize is large enough to potentially overflow
-    if (this._offsetSize > 6) {
-      // 6 bytes = 48 bits, safely under MAX_SAFE_INTEGER
-      let result = 0n;
-      for (let i = 0; i < this._offsetSize; i++) {
-        result =
-          (result << 8n) | BigInt(this._buffer.readUInt8(offsetStart + i));
-      }
-      // Convert back to number, with a warning if precision loss occurs
-      const numResult = Number(result);
-      if (BigInt(numResult) !== result) {
-        log.warn(
-          'Precision loss when converting offset to Number. This may cause issues.',
-        );
-      }
-      return numResult;
-    } else {
-      // Use regular number arithmetic for smaller values
-      let result = 0;
-      for (let i = 0; i < this._offsetSize; i++) {
-        result = (result << 8) | this._buffer.readUInt8(offsetStart + i);
-      }
-      return result;
-    }
+    return this._readMultiByteInteger(
+      offsetStart,
+      this._offsetSize,
+      'Offset'
+    );
   }
 
   /**
@@ -278,30 +278,11 @@ class BinaryPlistParser {
    * @returns The parsed UID value
    */
   private _parseUidValue(startOffset: number, uidByteCount: number): number {
-    // Use BigInt for calculations if uidByteCount is large enough to potentially overflow
-    if (uidByteCount > 6) {
-      // 6 bytes = 48 bits, safely under MAX_SAFE_INTEGER
-      let uidValue = 0n;
-      for (let j = 0; j < uidByteCount; j++) {
-        uidValue =
-          (uidValue << 8n) | BigInt(this._buffer.readUInt8(startOffset + j));
-      }
-      // Convert back to number, with a warning if precision loss occurs
-      const numResult = Number(uidValue);
-      if (BigInt(numResult) !== uidValue) {
-        log.warn(
-          'Precision loss when converting UID value to Number. This may cause issues.',
-        );
-      }
-      return numResult;
-    } else {
-      // Use regular number arithmetic for smaller values
-      let uidValue = 0;
-      for (let j = 0; j < uidByteCount; j++) {
-        uidValue = (uidValue << 8) | this._buffer.readUInt8(startOffset + j);
-      }
-      return uidValue;
-    }
+    return this._readMultiByteInteger(
+      startOffset,
+      uidByteCount,
+      'UID'
+    );
   }
 
   /**
@@ -330,31 +311,11 @@ class BinaryPlistParser {
 
         // Read the length based on the integer size
         const intByteCount = 1 << intInfo;
-
-        // Use BigInt for calculations if intByteCount is large enough to potentially overflow
-        if (intByteCount > 6) {
-          // 6 bytes = 48 bits, safely under MAX_SAFE_INTEGER
-          let bigObjLength = 0n;
-          for (let j = 0; j < intByteCount; j++) {
-            bigObjLength =
-              (bigObjLength << 8n) |
-              BigInt(this._buffer.readUInt8(startOffset + j));
-          }
-          // Convert back to number, with a warning if precision loss occurs
-          objLength = Number(bigObjLength);
-          if (BigInt(objLength) !== bigObjLength) {
-            log.warn(
-              'Precision loss when converting object length to Number. This may cause issues.',
-            );
-          }
-        } else {
-          // Use regular number arithmetic for smaller values
-          objLength = 0;
-          for (let j = 0; j < intByteCount; j++) {
-            objLength =
-              (objLength << 8) | this._buffer.readUInt8(startOffset + j);
-          }
-        }
+        objLength = this._readMultiByteInteger(
+          startOffset,
+          intByteCount,
+          'Object length'
+        );
         startOffset += intByteCount;
       }
 
