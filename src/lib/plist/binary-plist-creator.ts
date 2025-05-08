@@ -5,41 +5,33 @@
  * commonly used in Apple's iOS and macOS systems.
  */
 import type { PlistDictionary, PlistValue } from '../types.js';
+import { APPLE_EPOCH_OFFSET, BPLIST_MAGIC_AND_VERSION, BPLIST_TYPE } from './constants.js';
 
-// Constants for binary plist format
-const BPLIST_MAGIC = 'bplist';
-const BPLIST_VERSION = '00';
-const BPLIST_MAGIC_AND_VERSION = Buffer.from(
-  `${BPLIST_MAGIC}${BPLIST_VERSION}`,
-);
-
-// Object types in binary plist
-const BPLIST_TYPE = {
-  NULL: 0x00,
-  FALSE: 0x08,
-  TRUE: 0x09,
-  FILL: 0x0f,
-  INT: 0x10,
-  REAL: 0x20,
-  DATE: 0x30,
-  DATA: 0x40,
-  STRING_ASCII: 0x50,
-  STRING_UNICODE: 0x60,
-  UID: 0x80,
-  ARRAY: 0xa0,
-  SET: 0xc0,
-  DICT: 0xd0,
-};
+/**
+ * Checks if a value is a plain object (not null, not an array, not a Date, not a Buffer)
+ * @param value - The value to check
+ * @returns True if the value is a plain object
+ */
+function isPlainObject(value: unknown): boolean {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    !(value instanceof Date) &&
+    !(value instanceof Buffer) &&
+    Object.getPrototypeOf(value) === Object.prototype
+  );
+}
 
 /**
  * Class for creating binary property lists
  */
 class BinaryPlistCreator {
-  _objectTable: PlistValue[] = [];
-  _objectRefMap = new Map<PlistValue, number>();
-  _objectRefSize: number = 0;
-  _offsetSize: number = 0;
-  _rootObject: PlistValue;
+  private _objectTable: PlistValue[] = [];
+  private _objectRefMap = new Map<PlistValue, number>();
+  private _objectRefSize: number = 0;
+  private _offsetSize: number = 0;
+  private _rootObject: PlistValue;
 
   /**
    * Creates a new BinaryPlistCreator
@@ -52,7 +44,7 @@ class BinaryPlistCreator {
   /**
    * Collects all unique objects in the object hierarchy
    */
-  _collectObjects(): void {
+  private _collectObjects(): void {
     this._collectObjectsRecursive(this._rootObject);
 
     // Calculate the object reference size based on the number of objects
@@ -64,7 +56,7 @@ class BinaryPlistCreator {
    * Recursively collects objects from a value
    * @param value - The value to collect objects from
    */
-  _collectObjectsRecursive(value: PlistValue): void {
+  private _collectObjectsRecursive(value: PlistValue): void {
     // Skip if already in the table
     if (this._objectRefMap.has(value)) {
       return;
@@ -82,7 +74,7 @@ class BinaryPlistCreator {
       }
     } else if (
       value !== null &&
-      typeof value === 'object' &&
+      isPlainObject(value) &&
       !(value instanceof Date) &&
       !(value instanceof Buffer)
     ) {
@@ -100,7 +92,7 @@ class BinaryPlistCreator {
    * @param value - The number to calculate for
    * @returns The minimum number of bytes needed (1, 2, 4, or 8)
    */
-  _calculateMinByteSize(value: number): number {
+  private _calculateMinByteSize(value: number): number {
     if (value < 256) {
       return 1;
     } else if (value < 65536) {
@@ -117,7 +109,7 @@ class BinaryPlistCreator {
    * @param buffers - Array of buffers
    * @returns Total length
    */
-  _calculateObjectDataLength(buffers: Buffer[]): number {
+  private _calculateObjectDataLength(buffers: Buffer[]): number {
     return buffers.reduce((sum, buffer) => sum + buffer.length, 0);
   }
 
@@ -128,7 +120,7 @@ class BinaryPlistCreator {
    * @param value - Value to write
    * @param size - Number of bytes to use
    */
-  _writeOffsetToBuffer(
+  private _writeOffsetToBuffer(
     buffer: Buffer,
     position: number,
     value: number,
@@ -141,6 +133,7 @@ class BinaryPlistCreator {
     } else if (size === 4) {
       buffer.writeUInt32BE(value, position);
     } else if (size === 8) {
+      // Use BigInt directly for the value to avoid potential precision issues
       buffer.writeBigUInt64BE(BigInt(value), position);
     }
   }
@@ -151,7 +144,7 @@ class BinaryPlistCreator {
    * @param position - Position in the buffer
    * @param value - BigInt value to write
    */
-  _writeBigIntToBuffer(buffer: Buffer, position: number, value: bigint): void {
+  private _writeBigIntToBuffer(buffer: Buffer, position: number, value: bigint): void {
     buffer.writeBigUInt64BE(value, position);
   }
 
@@ -159,7 +152,7 @@ class BinaryPlistCreator {
    * Creates binary data for a null value
    * @returns Buffer containing the binary data
    */
-  _createNullData(): Buffer {
+  private _createNullData(): Buffer {
     return Buffer.from([BPLIST_TYPE.NULL]);
   }
 
@@ -168,7 +161,7 @@ class BinaryPlistCreator {
    * @param value - The boolean value
    * @returns Buffer containing the binary data
    */
-  _createBooleanData(value: boolean): Buffer {
+  private _createBooleanData(value: boolean): Buffer {
     return Buffer.from([value ? BPLIST_TYPE.TRUE : BPLIST_TYPE.FALSE]);
   }
 
@@ -177,35 +170,34 @@ class BinaryPlistCreator {
    * @param value - The integer value
    * @returns Buffer containing the binary data
    */
-  _createIntegerData(value: number): Buffer {
+  private _createIntegerData(value: number): Buffer {
+    let buffer: Buffer;
+    
     // Determine the smallest representation
     if (value >= 0 && value <= 255) {
-      const buffer = Buffer.alloc(2);
+      buffer = Buffer.alloc(2);
       buffer.writeUInt8(BPLIST_TYPE.INT | 0, 0);
       buffer.writeUInt8(value, 1);
-      return buffer;
     } else if (value >= -128 && value <= 127) {
-      const buffer = Buffer.alloc(2);
+      buffer = Buffer.alloc(2);
       buffer.writeUInt8(BPLIST_TYPE.INT | 0, 0);
       buffer.writeInt8(value, 1);
-      return buffer;
     } else if (value >= -32768 && value <= 32767) {
-      const buffer = Buffer.alloc(3);
+      buffer = Buffer.alloc(3);
       buffer.writeUInt8(BPLIST_TYPE.INT | 1, 0);
       buffer.writeInt16BE(value, 1);
-      return buffer;
     } else if (value >= -2147483648 && value <= 2147483647) {
-      const buffer = Buffer.alloc(5);
+      buffer = Buffer.alloc(5);
       buffer.writeUInt8(BPLIST_TYPE.INT | 2, 0);
       buffer.writeInt32BE(value, 1);
-      return buffer;
     } else {
-      // 64-bit integer
-      const buffer = Buffer.alloc(9);
+      // 64-bit integer - use BigInt directly to avoid precision issues
+      buffer = Buffer.alloc(9);
       buffer.writeUInt8(BPLIST_TYPE.INT | 3, 0);
       buffer.writeBigInt64BE(BigInt(value), 1);
-      return buffer;
     }
+    
+    return buffer;
   }
 
   /**
@@ -213,7 +205,7 @@ class BinaryPlistCreator {
    * @param value - The floating point value
    * @returns Buffer containing the binary data
    */
-  _createFloatData(value: number): Buffer {
+  private _createFloatData(value: number): Buffer {
     const buffer = Buffer.alloc(9);
     buffer.writeUInt8(BPLIST_TYPE.REAL | 3, 0); // Use double precision
     buffer.writeDoubleBE(value, 1);
@@ -225,11 +217,10 @@ class BinaryPlistCreator {
    * @param value - The date value
    * @returns Buffer containing the binary data
    */
-  _createDateData(value: Date): Buffer {
+  private _createDateData(value: Date): Buffer {
     const buffer = Buffer.alloc(9);
     buffer.writeUInt8(BPLIST_TYPE.DATE, 0);
     // Convert to seconds since Apple epoch (2001-01-01)
-    const APPLE_EPOCH_OFFSET = 978307200; // Seconds between 1970 and 2001
     const timestamp = value.getTime() / 1000 - APPLE_EPOCH_OFFSET;
     buffer.writeDoubleBE(timestamp, 1);
     return buffer;
@@ -240,7 +231,7 @@ class BinaryPlistCreator {
    * @param value - The integer value
    * @returns Buffer containing the integer header
    */
-  _createIntHeader(value: number): Buffer {
+  private _createIntHeader(value: number): Buffer {
     if (value < 256) {
       const buffer = Buffer.alloc(2);
       buffer.writeUInt8(BPLIST_TYPE.INT | 0, 0);
@@ -264,7 +255,7 @@ class BinaryPlistCreator {
    * @param value - The buffer value
    * @returns Buffer containing the binary data
    */
-  _createBufferData(value: Buffer): Buffer {
+  private _createBufferData(value: Buffer): Buffer {
     const length = value.length;
     let header: Buffer;
 
@@ -287,7 +278,7 @@ class BinaryPlistCreator {
    * @param value - The string value
    * @returns Buffer containing the binary data
    */
-  _createStringData(value: string): Buffer {
+  private _createStringData(value: string): Buffer {
     // Check if string can be ASCII
     // eslint-disable-next-line no-control-regex
     const isAscii = /^[\x00-\x7F]*$/.test(value);
@@ -295,7 +286,8 @@ class BinaryPlistCreator {
       ? Buffer.from(value, 'ascii')
       : Buffer.from(value, 'utf16le');
 
-    const length = isAscii ? value.length : value.length;
+    // Fixed the typo here - using stringBuffer.length instead of value.length for Unicode strings
+    const length = isAscii ? value.length : stringBuffer.length / 2;
     let header: Buffer;
 
     if (length < 15) {
@@ -325,7 +317,7 @@ class BinaryPlistCreator {
    * @param value - The array value
    * @returns Buffer containing the binary data
    */
-  _createArrayData(value: PlistValue[]): Buffer {
+  private _createArrayData(value: PlistValue[]): Buffer {
     const length = value.length;
     let header: Buffer;
 
@@ -360,7 +352,7 @@ class BinaryPlistCreator {
    * @param value - The dictionary value
    * @returns Buffer containing the binary data
    */
-  _createDictionaryData(value: PlistDictionary): Buffer {
+  private _createDictionaryData(value: PlistDictionary): Buffer {
     const keys = Object.keys(value);
     const length = keys.length;
     let header: Buffer;
@@ -407,7 +399,7 @@ class BinaryPlistCreator {
    * @param value - The value to convert
    * @returns Buffer containing the binary data
    */
-  _createObjectData(value: PlistValue): Buffer {
+  private _createObjectData(value: PlistValue): Buffer {
     // Handle null and booleans
     if (value === null) {
       return this._createNullData();
@@ -446,8 +438,8 @@ class BinaryPlistCreator {
       return this._createArrayData(value);
     }
 
-    // Handle objects (dictionaries)
-    if (typeof value === 'object') {
+    // Handle objects (dictionaries) - using isPlainObject for better type checking
+    if (isPlainObject(value)) {
       return this._createDictionaryData(value as PlistDictionary);
     }
 
@@ -460,7 +452,7 @@ class BinaryPlistCreator {
    * @param objectOffsets - Array of object offsets
    * @returns Buffer containing the offset table
    */
-  _createOffsetTable(objectOffsets: number[]): Buffer {
+  private _createOffsetTable(objectOffsets: number[]): Buffer {
     const numObjects = this._objectTable.length;
     const offsetTable = Buffer.alloc(numObjects * this._offsetSize);
 
@@ -482,7 +474,7 @@ class BinaryPlistCreator {
    * @param offsetTableOffset - Offset of the offset table
    * @returns Buffer containing the trailer
    */
-  _createTrailer(numObjects: number, offsetTableOffset: number): Buffer {
+  private _createTrailer(numObjects: number, offsetTableOffset: number): Buffer {
     const trailer = Buffer.alloc(32);
     // 6 unused bytes
     trailer.fill(0, 0, 6);

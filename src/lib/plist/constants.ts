@@ -1,0 +1,31 @@
+/**
+ * Common constants for plist operations
+ */
+
+// Constants for binary plist format
+export const BPLIST_MAGIC = 'bplist';
+export const BPLIST_VERSION = '00';
+export const BPLIST_MAGIC_AND_VERSION = Buffer.from(
+  `${BPLIST_MAGIC}${BPLIST_VERSION}`,
+);
+
+// Apple epoch offset (seconds between Unix epoch 1970-01-01 and Apple epoch 2001-01-01)
+export const APPLE_EPOCH_OFFSET = 978307200;
+
+// Object types in binary plist
+export const BPLIST_TYPE = {
+  NULL: 0x00,
+  FALSE: 0x08,
+  TRUE: 0x09,
+  FILL: 0x0f,
+  INT: 0x10,
+  REAL: 0x20,
+  DATE: 0x30,
+  DATA: 0x40,
+  STRING_ASCII: 0x50,
+  STRING_UNICODE: 0x60,
+  UID: 0x80,
+  ARRAY: 0xa0,
+  SET: 0xc0,
+  DICT: 0xd0,
+};

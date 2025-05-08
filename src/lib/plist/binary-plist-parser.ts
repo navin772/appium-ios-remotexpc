@@ -7,6 +7,7 @@
 import { logger } from '@appium/support';
 
 import type { PlistArray, PlistDictionary, PlistValue } from '../types.js';
+import { APPLE_EPOCH_OFFSET, BPLIST_MAGIC_AND_VERSION, BPLIST_TYPE } from './constants.js';
 
 const log = logger.getLogger('Plist');
 
@@ -25,42 +26,17 @@ interface TempObject {
  */
 type ObjectTableItem = PlistValue | TempObject;
 
-// Constants for binary plist format
-const BPLIST_MAGIC = 'bplist';
-const BPLIST_VERSION = '00';
-const BPLIST_MAGIC_AND_VERSION = Buffer.from(
-  `${BPLIST_MAGIC}${BPLIST_VERSION}`,
-);
-
-// Object types in binary plist
-const BPLIST_TYPE = {
-  NULL: 0x00,
-  FALSE: 0x08,
-  TRUE: 0x09,
-  FILL: 0x0f,
-  INT: 0x10,
-  REAL: 0x20,
-  DATE: 0x30,
-  DATA: 0x40,
-  STRING_ASCII: 0x50,
-  STRING_UNICODE: 0x60,
-  UID: 0x80,
-  ARRAY: 0xa0,
-  SET: 0xc0,
-  DICT: 0xd0,
-};
-
 /**
  * Class for parsing binary property lists
  */
 class BinaryPlistParser {
-  _buffer: Buffer;
-  _offsetSize: number;
-  _objectRefSize: number;
-  _numObjects: number;
-  _topObject: number;
-  _offsetTableOffset: number;
-  _objectTable: ObjectTableItem[];
+  private _buffer: Buffer;
+  private _offsetSize: number;
+  private _objectRefSize: number;
+  private _numObjects: number;
+  private _topObject: number;
+  private _offsetTableOffset: number;
+  private _objectTable: ObjectTableItem[];
 
   /**
    * Creates a new BinaryPlistParser
@@ -82,7 +58,7 @@ class BinaryPlistParser {
    * Validates the binary plist header
    * @throws Error if the buffer is not a valid binary plist
    */
-  _validateHeader(): void {
+  private _validateHeader(): void {
     if (
       this._buffer.length < 8 ||
       !this._buffer.slice(0, 8).equals(BPLIST_MAGIC_AND_VERSION)
@@ -95,7 +71,7 @@ class BinaryPlistParser {
    * Parses the trailer section of the binary plist
    * @throws Error if the buffer is too small to contain a trailer
    */
-  _parseTrailer(): void {
+  private _parseTrailer(): void {
     const trailerSize = 32; // Last 32 bytes are the trailer
     if (this._buffer.length < trailerSize) {
       throw new Error('Binary plist is too small to contain a trailer.');
@@ -116,7 +92,7 @@ class BinaryPlistParser {
    * @param offset - The offset to read from
    * @returns The object reference index
    */
-  _readObjectRef(offset: number): number {
+  private _readObjectRef(offset: number): number {
     let result = 0;
     for (let i = 0; i < this._objectRefSize; i++) {
       result = (result << 8) | this._buffer.readUInt8(offset + i);
@@ -129,7 +105,7 @@ class BinaryPlistParser {
    * @param index - The index in the offset table
    * @returns The offset value
    */
-  _readOffset(index: number): number {
+  private _readOffset(index: number): number {
     const offsetStart = this._offsetTableOffset + index * this._offsetSize;
     let result = 0;
     for (let i = 0; i < this._offsetSize; i++) {
@@ -144,7 +120,7 @@ class BinaryPlistParser {
    * @param intByteCount - The number of bytes to read
    * @returns The parsed integer value
    */
-  _parseIntegerValue(startOffset: number, intByteCount: number): number {
+  private _parseIntegerValue(startOffset: number, intByteCount: number): number {
     let intValue = 0;
 
     // Handle different integer sizes
@@ -178,7 +154,7 @@ class BinaryPlistParser {
    * @param floatByteCount - The number of bytes to read
    * @returns The parsed floating point value
    */
-  _parseRealValue(startOffset: number, floatByteCount: number): number {
+  private _parseRealValue(startOffset: number, floatByteCount: number): number {
     switch (floatByteCount) {
       case 4:
         return this._buffer.readFloatBE(startOffset);
@@ -194,11 +170,10 @@ class BinaryPlistParser {
    * @param startOffset - The offset to start reading from
    * @returns The parsed Date object
    */
-  _parseDateValue(startOffset: number): Date {
+  private _parseDateValue(startOffset: number): Date {
     // Date is stored as a float, seconds since 2001-01-01
     const timestamp = this._buffer.readDoubleBE(startOffset);
     // Convert Apple epoch (2001-01-01) to Unix epoch (1970-01-01)
-    const APPLE_EPOCH_OFFSET = 978307200; // Seconds between 1970 and 2001
     return new Date((timestamp + APPLE_EPOCH_OFFSET) * 1000);
   }
 
@@ -208,7 +183,7 @@ class BinaryPlistParser {
    * @param objLength - The length of the data
    * @returns The parsed Buffer
    */
-  _parseDataValue(startOffset: number, objLength: number): Buffer {
+  private _parseDataValue(startOffset: number, objLength: number): Buffer {
     return Buffer.from(
       this._buffer.slice(startOffset, startOffset + objLength),
     );
@@ -220,7 +195,7 @@ class BinaryPlistParser {
    * @param objLength - The length of the string
    * @returns The parsed string
    */
-  _parseAsciiString(startOffset: number, objLength: number): string {
+  private _parseAsciiString(startOffset: number, objLength: number): string {
     return this._buffer
       .slice(startOffset, startOffset + objLength)
       .toString('ascii');
@@ -232,7 +207,7 @@ class BinaryPlistParser {
    * @param objLength - The length of the string in characters
    * @returns The parsed string
    */
-  _parseUnicodeString(startOffset: number, objLength: number): string {
+  private _parseUnicodeString(startOffset: number, objLength: number): string {
     // Unicode strings are stored as UTF-16BE
     const utf16Buffer = Buffer.alloc(objLength * 2);
     for (let j = 0; j < objLength; j++) {
@@ -250,7 +225,7 @@ class BinaryPlistParser {
    * @param uidByteCount - The number of bytes to read
    * @returns The parsed UID value
    */
-  _parseUidValue(startOffset: number, uidByteCount: number): number {
+  private _parseUidValue(startOffset: number, uidByteCount: number): number {
     let uidValue = 0;
     for (let j = 0; j < uidByteCount; j++) {
       uidValue = (uidValue << 8) | this._buffer.readUInt8(startOffset + j);
@@ -261,7 +236,7 @@ class BinaryPlistParser {
   /**
    * Parses all objects in the binary plist
    */
-  _parseObjects(): void {
+  private _parseObjects(): void {
     for (let i = 0; i < this._numObjects; i++) {
       const objOffset = this._readOffset(i);
       const objType = this._buffer.readUInt8(objOffset) & 0xf0;
@@ -310,7 +285,7 @@ class BinaryPlistParser {
    * @param objLength - The object length
    * @returns The parsed object
    */
-  _parseObjectByType(
+  private _parseObjectByType(
     objType: number,
     objInfo: number,
     startOffset: number,
@@ -359,7 +334,7 @@ class BinaryPlistParser {
    * @param objInfo - The object info
    * @returns The parsed value (null, false, or true)
    */
-  _parseNullType(objInfo: number): PlistValue {
+  private _parseNullType(objInfo: number): PlistValue {
     switch (objInfo) {
       case 0x00:
         return null;
@@ -380,7 +355,7 @@ class BinaryPlistParser {
    * @param startOffset - The start offset
    * @returns The temporary array object
    */
-  _createTempArray(objLength: number, startOffset: number): TempObject {
+  private _createTempArray(objLength: number, startOffset: number): TempObject {
     return {
       type: 'array',
       objLength,
@@ -395,7 +370,7 @@ class BinaryPlistParser {
    * @param startOffset - The start offset
    * @returns The temporary dictionary object
    */
-  _createTempDict(objLength: number, startOffset: number): TempObject {
+  private _createTempDict(objLength: number, startOffset: number): TempObject {
     return {
       type: 'dict',
       objLength,
@@ -409,14 +384,14 @@ class BinaryPlistParser {
    * @param obj - The object to check
    * @returns True if the object is a TempObject
    */
-  _isTempObject(obj: ObjectTableItem): obj is TempObject {
+  private _isTempObject(obj: ObjectTableItem): obj is TempObject {
     return typeof obj === 'object' && obj !== null && 'type' in obj;
   }
 
   /**
    * Resolves references for arrays and dictionaries
    */
-  _resolveReferences(): void {
+  private _resolveReferences(): void {
     for (let i = 0; i < this._numObjects; i++) {
       const obj = this._objectTable[i];
       if (this._isTempObject(obj)) {
@@ -434,7 +409,7 @@ class BinaryPlistParser {
    * @param obj - The temporary array object
    * @param index - The index in the object table
    */
-  _resolveArrayReferences(obj: TempObject, index: number): void {
+  private _resolveArrayReferences(obj: TempObject, index: number): void {
     const array = obj.value as PlistArray;
     for (let j = 0; j < obj.objLength; j++) {
       const refIdx = this._readObjectRef(
@@ -454,7 +429,7 @@ class BinaryPlistParser {
    * @param obj - The temporary dictionary object
    * @param index - The index in the object table
    */
-  _resolveDictReferences(obj: TempObject, index: number): void {
+  private _resolveDictReferences(obj: TempObject, index: number): void {
     const dict = obj.value as PlistDictionary;
     const keyCount = obj.objLength;
 
@@ -488,7 +463,7 @@ class BinaryPlistParser {
    * Handles special case for the top object
    * @returns The final parsed value
    */
-  _handleTopObject(): PlistValue {
+  private _handleTopObject(): PlistValue {
     // If the top object is an empty object but we have key-value pairs in the array format,
     // convert it to a proper object
     if (
@@ -514,7 +489,7 @@ class BinaryPlistParser {
    * Converts an array format to a dictionary
    * @returns The converted dictionary
    */
-  _convertArrayToDict(): PlistDictionary {
+  private _convertArrayToDict(): PlistDictionary {
     const result: PlistDictionary = {};
     // Process the array in key-value pairs
     for (let i = 1; i < this._objectTable.length; i += 2) {
