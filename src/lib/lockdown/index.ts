@@ -163,7 +163,8 @@ export class LockdownService extends BasePlistService {
         super.close();
       }
     } catch (err) {
-      log.error(`Error or closing socket: ${err}`);
+      log.error(`Error on closing socket: ${err}`);
+      throw err;
     }
   }
 

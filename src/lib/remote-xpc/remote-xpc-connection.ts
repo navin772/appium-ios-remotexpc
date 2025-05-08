@@ -103,13 +103,19 @@ class RemoteXpcConnection {
    */
   async close(): Promise<void> {
     if (this._socket) {
-      return new Promise((resolve) => {
-        this._socket!.end(() => {
+      return new Promise((resolve, reject) => {
+        this._socket!.end((err?: Error) => {
+          if (err) {
+            log.error(`Error closing socket: ${err}`);
+            reject(err);
+          } else {
+            resolve();
+          }
+          // Clean up resources regardless of success or failure
           this._socket = undefined;
           this._isConnected = false;
           this._handshake = undefined;
           this._services = undefined;
-          resolve();
         });
       });
     }

@@ -135,6 +135,7 @@ export class PlistService {
       log.error(
         `Error closing socket: ${error instanceof Error ? error.message : String(error)}`,
       );
+      throw error;
     }
   }
 

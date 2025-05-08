@@ -366,13 +366,19 @@ export class Usbmux extends BaseSocketService {
    * @returns Promise that resolves when the socket is closed.
    */
   close(): Promise<void> {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       // If the socket is still open, end it gracefully.
       if (!this._socketClient.destroyed) {
         // End the connection and then destroy it once closed.
-        this._socketClient.end(() => {
-          this._socketClient.destroy();
-          resolve();
+        this._socketClient.end((err?: Error) => {
+          if (err) {
+            log.error(`Error closing usbmux socket: ${err}`);
+            this._socketClient.destroy();
+            reject(err);
+          } else {
+            this._socketClient.destroy();
+            resolve();
+          }
         });
       } else {
         resolve();
@@ -573,11 +579,16 @@ export class RelayService {
    * Stops the relay service
    */
   async stop(): Promise<void> {
-    return new Promise<void>((resolve) => {
+    return new Promise<void>((resolve, reject) => {
       if (this.server) {
-        this.server.close(() => {
-          log.info('Relay server stopped');
-          resolve();
+        this.server.close((err?: Error) => {
+          if (err) {
+            log.error(`Error stopping relay server: ${err}`);
+            reject(err);
+          } else {
+            log.info('Relay server stopped');
+            resolve();
+          }
         });
       } else {
         resolve();
