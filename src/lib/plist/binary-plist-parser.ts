@@ -1,4 +1,4 @@
-  /**
+/**
  * Binary Property List (bplist) Parser
  *
  * This module provides functionality to parse binary property lists (bplists)
@@ -564,7 +564,6 @@ class BinaryPlistParser {
     }
     return result;
   }
-
 }
 
 /**
