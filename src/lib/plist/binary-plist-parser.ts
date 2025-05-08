@@ -7,7 +7,11 @@
 import { logger } from '@appium/support';
 
 import type { PlistArray, PlistDictionary, PlistValue } from '../types.js';
-import { APPLE_EPOCH_OFFSET, BPLIST_MAGIC_AND_VERSION, BPLIST_TYPE } from './constants.js';
+import {
+  APPLE_EPOCH_OFFSET,
+  BPLIST_MAGIC_AND_VERSION,
+  BPLIST_TYPE,
+} from './constants.js';
 
 const log = logger.getLogger('Plist');
 
@@ -118,34 +122,41 @@ class BinaryPlistParser {
    * Parses an integer value from the buffer
    * @param startOffset - The offset to start reading from
    * @param intByteCount - The number of bytes to read
-   * @returns The parsed integer value
+   * @returns The parsed integer value (number or bigint)
    */
-  private _parseIntegerValue(startOffset: number, intByteCount: number): number {
-    let intValue = 0;
-
+  private _parseIntegerValue(
+    startOffset: number,
+    intByteCount: number,
+  ): number | bigint {
     // Handle different integer sizes
     switch (intByteCount) {
       case 1:
-        intValue = this._buffer.readInt8(startOffset);
-        break;
+        return this._buffer.readInt8(startOffset);
       case 2:
-        intValue = this._buffer.readInt16BE(startOffset);
-        break;
+        return this._buffer.readInt16BE(startOffset);
       case 4:
-        intValue = this._buffer.readInt32BE(startOffset);
-        break;
-      case 8:
+        return this._buffer.readInt32BE(startOffset);
+      case 8: {
         // For 64-bit integers, we need to handle potential precision loss
         const bigInt = this._buffer.readBigInt64BE(startOffset);
-        intValue = Number(bigInt);
+        const intValue = Number(bigInt);
+
         // Check if conversion to Number caused precision loss
         if (BigInt(intValue) !== bigInt) {
-          log.warn('Precision loss when converting 64-bit integer to Number');
+          log.warn(
+            'Precision loss when converting 64-bit integer to Number. Returning BigInt value.',
+          );
+          return bigInt; // Return the BigInt directly to avoid precision loss
         }
-        break;
-    }
 
-    return intValue;
+        return intValue; // Return as number if no precision loss
+      }
+      default:
+        log.warn(
+          `Unexpected integer byte count: ${intByteCount}. Returning 0.`,
+        );
+        return 0;
+    }
   }
 
   /**
@@ -161,6 +172,9 @@ class BinaryPlistParser {
       case 8:
         return this._buffer.readDoubleBE(startOffset);
       default:
+        log.warn(
+          `Unexpected float byte count: ${floatByteCount}. Returning 0.`,
+        );
         return 0;
     }
   }
@@ -345,6 +359,9 @@ class BinaryPlistParser {
       case 0x0f:
         return null; // fill byte
       default:
+        log.warn(
+          `Unexpected null type object info: 0x${objInfo.toString(16)}. Returning null.`,
+        );
         return null;
     }
   }

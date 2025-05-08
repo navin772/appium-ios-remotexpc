@@ -8,6 +8,7 @@
 export type PlistValue =
   | string
   | number
+  | bigint
   | boolean
   | Date
   | Buffer
@@ -38,6 +39,7 @@ export type PlistMessage = PlistDictionary;
 export type XPCValue =
   | string
   | number
+  | bigint
   | boolean
   | Date
   | Buffer

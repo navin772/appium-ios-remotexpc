@@ -1,7 +1,11 @@
 // Export all components for easy imports
 import { createBinaryPlist } from './binary-plist-creator.js';
 import { isBinaryPlist, parseBinaryPlist } from './binary-plist-parser.js';
-import { APPLE_EPOCH_OFFSET, BPLIST_MAGIC_AND_VERSION, BPLIST_TYPE } from './constants.js';
+import {
+  APPLE_EPOCH_OFFSET,
+  BPLIST_MAGIC_AND_VERSION,
+  BPLIST_TYPE,
+} from './constants.js';
 import { LengthBasedSplitter } from './length-based-splitter.js';
 import { createPlist as createXmlPlist } from './plist-creator.js';
 import { PlistServiceDecoder } from './plist-decoder.js';

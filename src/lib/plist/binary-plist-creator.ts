@@ -5,7 +5,11 @@
  * commonly used in Apple's iOS and macOS systems.
  */
 import type { PlistDictionary, PlistValue } from '../types.js';
-import { APPLE_EPOCH_OFFSET, BPLIST_MAGIC_AND_VERSION, BPLIST_TYPE } from './constants.js';
+import {
+  APPLE_EPOCH_OFFSET,
+  BPLIST_MAGIC_AND_VERSION,
+  BPLIST_TYPE,
+} from './constants.js';
 
 /**
  * Checks if a value is a plain object (not null, not an array, not a Date, not a Buffer)
@@ -31,7 +35,7 @@ class BinaryPlistCreator {
   private _objectRefMap = new Map<PlistValue, number>();
   private _objectRefSize: number = 0;
   private _offsetSize: number = 0;
-  private _rootObject: PlistValue;
+  private readonly _rootObject: PlistValue;
 
   /**
    * Creates a new BinaryPlistCreator
@@ -39,6 +43,50 @@ class BinaryPlistCreator {
    */
   constructor(rootObject: PlistValue) {
     this._rootObject = rootObject;
+  }
+
+  /**
+   * Creates the binary plist
+   * @returns Buffer containing the binary plist data
+   */
+  create(): Buffer {
+    // Collect all objects and assign IDs
+    this._collectObjects();
+
+    // Create object data
+    const objectOffsets: number[] = [];
+    const objectData: Buffer[] = [];
+
+    for (const value of this._objectTable) {
+      objectOffsets.push(this._calculateObjectDataLength(objectData));
+      objectData.push(this._createObjectData(value));
+    }
+
+    // Calculate offset table size
+    const maxOffset = this._calculateObjectDataLength(objectData);
+    this._offsetSize = this._calculateMinByteSize(maxOffset);
+
+    // Create offset table
+    const offsetTable = this._createOffsetTable(objectOffsets);
+
+    // Calculate offset table offset
+    const offsetTableOffset =
+      BPLIST_MAGIC_AND_VERSION.length +
+      this._calculateObjectDataLength(objectData);
+
+    // Create trailer
+    const trailer = this._createTrailer(
+      this._objectTable.length,
+      offsetTableOffset,
+    );
+
+    // Combine all parts
+    return Buffer.concat([
+      BPLIST_MAGIC_AND_VERSION,
+      ...objectData,
+      offsetTable,
+      trailer,
+    ]);
   }
 
   /**
@@ -123,18 +171,21 @@ class BinaryPlistCreator {
   private _writeOffsetToBuffer(
     buffer: Buffer,
     position: number,
-    value: number,
+    value: number | bigint,
     size: number,
   ): void {
     if (size === 1) {
-      buffer.writeUInt8(value, position);
+      buffer.writeUInt8(Number(value), position);
     } else if (size === 2) {
-      buffer.writeUInt16BE(value, position);
+      buffer.writeUInt16BE(Number(value), position);
     } else if (size === 4) {
-      buffer.writeUInt32BE(value, position);
+      buffer.writeUInt32BE(Number(value), position);
     } else if (size === 8) {
       // Use BigInt directly for the value to avoid potential precision issues
-      buffer.writeBigUInt64BE(BigInt(value), position);
+      buffer.writeBigUInt64BE(
+        typeof value === 'bigint' ? value : BigInt(value),
+        position,
+      );
     }
   }
 
@@ -144,7 +195,11 @@ class BinaryPlistCreator {
    * @param position - Position in the buffer
    * @param value - BigInt value to write
    */
-  private _writeBigIntToBuffer(buffer: Buffer, position: number, value: bigint): void {
+  private _writeBigIntToBuffer(
+    buffer: Buffer,
+    position: number,
+    value: bigint,
+  ): void {
     buffer.writeBigUInt64BE(value, position);
   }
 
@@ -167,13 +222,22 @@ class BinaryPlistCreator {
 
   /**
    * Creates binary data for an integer value
-   * @param value - The integer value
+   * @param value - The integer value (number or bigint)
    * @returns Buffer containing the binary data
    */
-  private _createIntegerData(value: number): Buffer {
+  private _createIntegerData(value: number | bigint): Buffer {
     let buffer: Buffer;
-    
-    // Determine the smallest representation
+
+    // If value is a BigInt, handle it directly
+    if (typeof value === 'bigint') {
+      // For BigInt values, we always use 64-bit representation
+      buffer = Buffer.alloc(9);
+      buffer.writeUInt8(BPLIST_TYPE.INT | 3, 0);
+      buffer.writeBigInt64BE(value, 1);
+      return buffer;
+    }
+
+    // For number values, determine the smallest representation
     if (value >= 0 && value <= 255) {
       buffer = Buffer.alloc(2);
       buffer.writeUInt8(BPLIST_TYPE.INT | 0, 0);
@@ -196,7 +260,7 @@ class BinaryPlistCreator {
       buffer.writeUInt8(BPLIST_TYPE.INT | 3, 0);
       buffer.writeBigInt64BE(BigInt(value), 1);
     }
-    
+
     return buffer;
   }
 
@@ -407,6 +471,11 @@ class BinaryPlistCreator {
       return this._createBooleanData(value);
     }
 
+    // Handle BigInt
+    if (typeof value === 'bigint') {
+      return this._createIntegerData(value);
+    }
+
     // Handle numbers
     if (typeof value === 'number') {
       // Check if it's an integer
@@ -474,7 +543,10 @@ class BinaryPlistCreator {
    * @param offsetTableOffset - Offset of the offset table
    * @returns Buffer containing the trailer
    */
-  private _createTrailer(numObjects: number, offsetTableOffset: number): Buffer {
+  private _createTrailer(
+    numObjects: number,
+    offsetTableOffset: number,
+  ): Buffer {
     const trailer = Buffer.alloc(32);
     // 6 unused bytes
     trailer.fill(0, 0, 6);
@@ -491,50 +563,6 @@ class BinaryPlistCreator {
 
     return trailer;
   }
-
-  /**
-   * Creates the binary plist
-   * @returns Buffer containing the binary plist data
-   */
-  create(): Buffer {
-    // Collect all objects and assign IDs
-    this._collectObjects();
-
-    // Create object data
-    const objectOffsets: number[] = [];
-    const objectData: Buffer[] = [];
-
-    for (const value of this._objectTable) {
-      objectOffsets.push(this._calculateObjectDataLength(objectData));
-      objectData.push(this._createObjectData(value));
-    }
-
-    // Calculate offset table size
-    const maxOffset = this._calculateObjectDataLength(objectData);
-    this._offsetSize = this._calculateMinByteSize(maxOffset);
-
-    // Create offset table
-    const offsetTable = this._createOffsetTable(objectOffsets);
-
-    // Calculate offset table offset
-    const offsetTableOffset =
-      BPLIST_MAGIC_AND_VERSION.length +
-      this._calculateObjectDataLength(objectData);
-
-    // Create trailer
-    const trailer = this._createTrailer(
-      this._objectTable.length,
-      offsetTableOffset,
-    );
-
-    // Combine all parts
-    return Buffer.concat([
-      BPLIST_MAGIC_AND_VERSION,
-      ...objectData,
-      offsetTable,
-      trailer,
-    ]);
-  }
 }
 
 /**
@@ -546,5 +574,3 @@ export function createBinaryPlist(obj: PlistValue): Buffer {
   const creator = new BinaryPlistCreator(obj);
   return creator.create();
 }
-
-export default createBinaryPlist;
