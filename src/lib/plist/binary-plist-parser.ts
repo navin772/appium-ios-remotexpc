@@ -148,20 +148,25 @@ class BinaryPlistParser {
     let intValue = 0;
 
     // Handle different integer sizes
-    if (intByteCount === 1) {
-      intValue = this._buffer.readInt8(startOffset);
-    } else if (intByteCount === 2) {
-      intValue = this._buffer.readInt16BE(startOffset);
-    } else if (intByteCount === 4) {
-      intValue = this._buffer.readInt32BE(startOffset);
-    } else if (intByteCount === 8) {
-      // For 64-bit integers, we need to handle potential precision loss
-      const bigInt = this._buffer.readBigInt64BE(startOffset);
-      intValue = Number(bigInt);
-      // Check if conversion to Number caused precision loss
-      if (BigInt(intValue) !== bigInt) {
-        log.warn('Precision loss when converting 64-bit integer to Number');
-      }
+    switch (intByteCount) {
+      case 1:
+        intValue = this._buffer.readInt8(startOffset);
+        break;
+      case 2:
+        intValue = this._buffer.readInt16BE(startOffset);
+        break;
+      case 4:
+        intValue = this._buffer.readInt32BE(startOffset);
+        break;
+      case 8:
+        // For 64-bit integers, we need to handle potential precision loss
+        const bigInt = this._buffer.readBigInt64BE(startOffset);
+        intValue = Number(bigInt);
+        // Check if conversion to Number caused precision loss
+        if (BigInt(intValue) !== bigInt) {
+          log.warn('Precision loss when converting 64-bit integer to Number');
+        }
+        break;
     }
 
     return intValue;
@@ -174,12 +179,14 @@ class BinaryPlistParser {
    * @returns The parsed floating point value
    */
   _parseRealValue(startOffset: number, floatByteCount: number): number {
-    if (floatByteCount === 4) {
-      return this._buffer.readFloatBE(startOffset);
-    } else if (floatByteCount === 8) {
-      return this._buffer.readDoubleBE(startOffset);
+    switch (floatByteCount) {
+      case 4:
+        return this._buffer.readFloatBE(startOffset);
+      case 8:
+        return this._buffer.readDoubleBE(startOffset);
+      default:
+        return 0;
     }
-    return 0;
   }
 
   /**
@@ -353,16 +360,18 @@ class BinaryPlistParser {
    * @returns The parsed value (null, false, or true)
    */
   _parseNullType(objInfo: number): PlistValue {
-    if (objInfo === 0x00) {
-      return null;
-    } else if (objInfo === 0x08) {
-      return false;
-    } else if (objInfo === 0x09) {
-      return true;
-    } else if (objInfo === 0x0f) {
-      return null; // fill byte
+    switch (objInfo) {
+      case 0x00:
+        return null;
+      case 0x08:
+        return false;
+      case 0x09:
+        return true;
+      case 0x0f:
+        return null; // fill byte
+      default:
+        return null;
     }
-    return null;
   }
 
   /**

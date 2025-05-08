@@ -21,14 +21,18 @@ class Struct {
   byteLength(): number {
     let total = 0;
     for (const t of this.types) {
-      if (t === 'H') {
-        total += 2;
-      } else if (t === 'B') {
-        total += 1;
-      } else if (t === 'L') {
-        total += 4;
-      } else {
-        throw new TypeError('Unsupported type: ' + t);
+      switch (t) {
+        case 'H':
+          total += 2;
+          break;
+        case 'B':
+          total += 1;
+          break;
+        case 'L':
+          total += 4;
+          break;
+        default:
+          throw new TypeError('Unsupported type: ' + t);
       }
     }
     return total;
@@ -42,17 +46,21 @@ class Struct {
     let offset = 0;
     for (const [i, t] of this.types.entries()) {
       const v = values[i];
-      if (t === 'H') {
-        buf.writeUInt16BE(v, offset);
-        offset += 2;
-      } else if (t === 'B') {
-        buf.writeUInt8(v, offset);
-        offset += 1;
-      } else if (t === 'L') {
-        buf.writeUInt32BE(v, offset);
-        offset += 4;
-      } else {
-        throw new TypeError('Unsupported type: ' + t);
+      switch (t) {
+        case 'H':
+          buf.writeUInt16BE(v, offset);
+          offset += 2;
+          break;
+        case 'B':
+          buf.writeUInt8(v, offset);
+          offset += 1;
+          break;
+        case 'L':
+          buf.writeUInt32BE(v, offset);
+          offset += 4;
+          break;
+        default:
+          throw new TypeError('Unsupported type: ' + t);
       }
     }
     return buf;

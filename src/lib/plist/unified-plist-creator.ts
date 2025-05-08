@@ -14,7 +14,6 @@ export function createPlist(
 ): string | Buffer {
   if (binary) {
     return createBinaryPlist(obj);
-  } else {
-    return createXmlPlist(obj);
   }
+  return createXmlPlist(obj);
 }

@@ -27,7 +27,7 @@ class Handshake {
     return new Promise((resolve, reject) => {
       this._socket.write(frame, (error: Error | null | undefined) => {
         if (error) {
-          reject('error: ' + error);
+          reject(error);
         } else {
           resolve();
         }
