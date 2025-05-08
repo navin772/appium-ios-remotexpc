@@ -1,4 +1,4 @@
-/**
+  /**
  * Binary Property List (bplist) Parser
  *
  * This module provides functionality to parse binary property lists (bplists)
@@ -56,6 +56,18 @@ class BinaryPlistParser {
     this._numObjects = 0;
     this._topObject = 0;
     this._offsetTableOffset = 0;
+  }
+
+  /**
+   * Parses the binary plist
+   * @returns The parsed JavaScript object
+   */
+  parse(): PlistValue {
+    this._validateHeader();
+    this._parseTrailer();
+    this._parseObjects();
+    this._resolveReferences();
+    return this._handleTopObject();
   }
 
   /**
@@ -553,17 +565,6 @@ class BinaryPlistParser {
     return result;
   }
 
-  /**
-   * Parses the binary plist
-   * @returns The parsed JavaScript object
-   */
-  parse(): PlistValue {
-    this._validateHeader();
-    this._parseTrailer();
-    this._parseObjects();
-    this._resolveReferences();
-    return this._handleTopObject();
-  }
 }
 
 /**
