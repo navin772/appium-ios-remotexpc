@@ -106,22 +106,24 @@ class BinaryPlistParser {
   private _readMultiByteInteger(
     startOffset: number,
     byteCount: number,
-    valueName: string
+    valueName: string,
   ): number {
     // Use BigInt for calculations if byteCount is large enough to potentially overflow
-    if (byteCount > 6) { // 6 bytes = 48 bits, safely under MAX_SAFE_INTEGER
+    if (byteCount > 6) {
+      // 6 bytes = 48 bits, safely under MAX_SAFE_INTEGER
       let result = 0n;
       for (let i = 0; i < byteCount; i++) {
-        result = (result << 8n) | BigInt(this._buffer.readUInt8(startOffset + i));
+        result =
+          (result << 8n) | BigInt(this._buffer.readUInt8(startOffset + i));
       }
-      
+
       // Check if the value exceeds MAX_SAFE_INTEGER
       if (result > BigInt(Number.MAX_SAFE_INTEGER)) {
         throw new Error(
-          `${valueName} value ${result} exceeds MAX_SAFE_INTEGER. Cannot safely convert to number.`
+          `${valueName} value ${result} exceeds MAX_SAFE_INTEGER. Cannot safely convert to number.`,
         );
       }
-      
+
       // Safe to convert to number without precision loss
       return Number(result);
     } else {
@@ -138,7 +140,7 @@ class BinaryPlistParser {
     return this._readMultiByteInteger(
       offset,
       this._objectRefSize,
-      'Object reference'
+      'Object reference',
     );
   }
 
@@ -149,11 +151,7 @@ class BinaryPlistParser {
    */
   private _readOffset(index: number): number {
     const offsetStart = this._offsetTableOffset + index * this._offsetSize;
-    return this._readMultiByteInteger(
-      offsetStart,
-      this._offsetSize,
-      'Offset'
-    );
+    return this._readMultiByteInteger(offsetStart, this._offsetSize, 'Offset');
   }
 
   /**
@@ -278,11 +276,7 @@ class BinaryPlistParser {
    * @returns The parsed UID value
    */
   private _parseUidValue(startOffset: number, uidByteCount: number): number {
-    return this._readMultiByteInteger(
-      startOffset,
-      uidByteCount,
-      'UID'
-    );
+    return this._readMultiByteInteger(startOffset, uidByteCount, 'UID');
   }
 
   /**
@@ -314,7 +308,7 @@ class BinaryPlistParser {
         objLength = this._readMultiByteInteger(
           startOffset,
           intByteCount,
-          'Object length'
+          'Object length',
         );
         startOffset += intByteCount;
       }
