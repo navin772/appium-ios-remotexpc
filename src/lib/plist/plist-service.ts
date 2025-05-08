@@ -132,10 +132,10 @@ export class PlistService {
     try {
       this._socket.end();
     } catch (error) {
+      // Log the error but don't rethrow it to ensure cleanup completes
       log.error(
         `Error closing socket: ${error instanceof Error ? error.message : String(error)}`,
       );
-      throw error;
     }
   }
 

@@ -164,16 +164,15 @@ export class LockdownService extends BasePlistService {
       }
     } catch (err) {
       log.error(`Error on closing socket: ${err}`);
-      throw err;
     }
   }
 
   private async getPairRecord(): Promise<PairRecord | null> {
+    let usbmux;
     try {
       log.debug(`Retrieving pair record for UDID: ${this._udid}`);
-      const usbmux = await createUsbmux();
+      usbmux = await createUsbmux();
       const record = await usbmux.readPairRecord(this._udid);
-      await usbmux.close();
       if (!record?.HostCertificate || !record.HostPrivateKey) {
         log.error('Pair record missing certificate or key');
         return null;
@@ -183,6 +182,12 @@ export class LockdownService extends BasePlistService {
     } catch (err) {
       log.error(`Error getting pair record for TLS: ${err}`);
       return null;
+    } finally {
+      if (usbmux) {
+        await usbmux
+          .close()
+          .catch((err) => log.error(`Error closing usbmux: ${err}`));
+      }
     }
   }
 }
@@ -195,16 +200,25 @@ export async function createLockdownServiceByUDID(
   port = 62078,
   autoSecure = true,
 ): Promise<LockdownServiceInfo> {
-  const usbmux = await createUsbmux();
-  log.debug('Listing connected devices...');
+  let usbmux;
+  let devices;
+  try {
+    usbmux = await createUsbmux();
+    log.debug('Listing connected devices...');
 
-  const devices = await usbmux.listDevices();
-  log.debug(
-    `Devices: ${devices.map((d) => d.Properties.SerialNumber).join(', ')}`,
-  );
+    devices = await usbmux.listDevices();
+    log.debug(
+      `Devices: ${devices.map((d) => d.Properties.SerialNumber).join(', ')}`,
+    );
+  } finally {
+    if (usbmux) {
+      await usbmux
+        .close()
+        .catch((err) => log.error(`Error closing usbmux: ${err}`));
+    }
+  }
 
-  await usbmux.close();
-  if (devices.length === 0) {
+  if (!devices || devices.length === 0) {
     throw new Error('No devices connected');
   }
 

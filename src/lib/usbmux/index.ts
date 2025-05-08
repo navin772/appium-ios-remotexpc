@@ -611,18 +611,20 @@ export async function connectAndRelay(
 ): Promise<Socket> {
   // Create and start the relay service
   const relay = new RelayService(deviceID, port, relayPort);
+  let socket: Socket | undefined;
 
   try {
     // Start the relay
     await relay.start();
 
     // Connect to the relay
-    return await relay.connect();
-  } catch (error) {
-    // Clean up if there's an error
-    await relay
-      .stop()
-      .catch((err) => log.error(`Error stopping relay: ${err}`));
-    throw error;
+    socket = await relay.connect();
+    return socket;
+  } finally {
+    if (!socket) {
+      await relay
+        .stop()
+        .catch((err) => log.error(`Error stopping relay: ${err}`));
+    }
   }
 }
