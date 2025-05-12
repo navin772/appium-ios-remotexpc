@@ -120,12 +120,7 @@ class BinaryPlistCreator {
       for (const item of value) {
         this._collectObjectsRecursive(item);
       }
-    } else if (
-      value !== null &&
-      isPlainObject(value) &&
-      !(value instanceof Date) &&
-      !(value instanceof Buffer)
-    ) {
+    } else if (value !== null && isPlainObject(value)) {
       // This is a dictionary
       const dict = value as PlistDictionary;
       for (const key of Object.keys(dict)) {
@@ -467,7 +462,7 @@ class BinaryPlistCreator {
     // Handle null and booleans
     if (value === null) {
       return this._createNullData();
-    } else if (value === false || value === true) {
+    } else if (typeof value === 'boolean') {
       return this._createBooleanData(value);
     }
 

@@ -138,14 +138,14 @@ class BinaryPlistParser {
 
       // Safe to convert to number without precision loss
       return Number(result);
-    } else {
-      // Use regular number arithmetic for smaller values
-      let result = 0;
-      for (let i = 0; i < byteCount; i++) {
-        result = (result << 8) | this._buffer.readUInt8(startOffset + i);
-      }
-      return result;
     }
+
+    // Use regular number arithmetic for smaller values
+    let result = 0;
+    for (let i = 0; i < byteCount; i++) {
+      result = (result << 8) | this._buffer.readUInt8(startOffset + i);
+    }
+    return result;
   }
 
   private _readObjectRef(offset: number): number {
@@ -200,10 +200,9 @@ class BinaryPlistParser {
         return intValue; // Return as number if no precision loss
       }
       default:
-        log.warn(
-          `Unexpected integer byte count: ${intByteCount}. Returning 0.`,
+        throw new TypeError(
+          `Unexpected integer byte count: ${intByteCount}. Cannot parse integer value.`,
         );
-        return 0;
     }
   }
 
@@ -220,10 +219,9 @@ class BinaryPlistParser {
       case 8:
         return this._buffer.readDoubleBE(startOffset);
       default:
-        log.warn(
-          `Unexpected float byte count: ${floatByteCount}. Returning 0.`,
+        throw new TypeError(
+          `Unexpected float byte count: ${floatByteCount}. Cannot parse real value.`,
         );
-        return 0;
     }
   }
 
@@ -403,10 +401,9 @@ class BinaryPlistParser {
       case 0x0f:
         return null; // fill byte
       default:
-        log.warn(
-          `Unexpected null type object info: 0x${objInfo.toString(16)}. Returning null.`,
+        throw new TypeError(
+          `Unexpected null type object info: 0x${objInfo.toString(16)}. Cannot parse null value.`,
         );
-        return null;
     }
   }
 

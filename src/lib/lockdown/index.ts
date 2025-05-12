@@ -116,13 +116,10 @@ export class LockdownService extends BasePlistService {
       log.warn('Missing certs/session info for TLS upgrade');
       return;
     }
-    let sess;
-    try {
-      sess = await this.startSession(pairRecord.HostID, pairRecord.SystemBUID);
-    } catch (err) {
-      log.error(`Failed to start session: ${err}`);
-      throw err;
-    }
+    const sess = await this.startSession(
+      pairRecord.HostID,
+      pairRecord.SystemBUID,
+    );
     if (!sess.enableSessionSSL) {
       log.info('Device did not request TLS upgrade. Continuing unencrypted.');
       return;
@@ -168,10 +165,9 @@ export class LockdownService extends BasePlistService {
   }
 
   private async getPairRecord(): Promise<PairRecord | null> {
-    let usbmux;
+    log.debug(`Retrieving pair record for UDID: ${this._udid}`);
+    const usbmux = await createUsbmux();
     try {
-      log.debug(`Retrieving pair record for UDID: ${this._udid}`);
-      usbmux = await createUsbmux();
       const record = await usbmux.readPairRecord(this._udid);
       if (!record?.HostCertificate || !record.HostPrivateKey) {
         log.error('Pair record missing certificate or key');
@@ -183,11 +179,9 @@ export class LockdownService extends BasePlistService {
       log.error(`Error getting pair record for TLS: ${err}`);
       return null;
     } finally {
-      if (usbmux) {
-        await usbmux
-          .close()
-          .catch((err) => log.error(`Error closing usbmux: ${err}`));
-      }
+      await usbmux
+        .close()
+        .catch((err) => log.error(`Error closing usbmux: ${err}`));
     }
   }
 }
@@ -200,10 +194,9 @@ export async function createLockdownServiceByUDID(
   port = 62078,
   autoSecure = true,
 ): Promise<LockdownServiceInfo> {
-  let usbmux;
   let devices;
+  const usbmux = await createUsbmux();
   try {
-    usbmux = await createUsbmux();
     log.debug('Listing connected devices...');
 
     devices = await usbmux.listDevices();
@@ -211,11 +204,9 @@ export async function createLockdownServiceByUDID(
       `Devices: ${devices.map((d) => d.Properties.SerialNumber).join(', ')}`,
     );
   } finally {
-    if (usbmux) {
-      await usbmux
-        .close()
-        .catch((err) => log.error(`Error closing usbmux: ${err}`));
-    }
+    await usbmux
+      .close()
+      .catch((err) => log.error(`Error closing usbmux: ${err}`));
   }
 
   if (!devices || devices.length === 0) {
@@ -234,7 +225,6 @@ export async function createLockdownServiceByUDID(
     (d) => d.Properties.SerialNumber === selectedUDID,
   );
   if (!device) {
-    log.error(`UDID ${selectedUDID} not found among connected devices`);
     throw new Error(`UDID ${selectedUDID} not found`);
   }
   log.info(

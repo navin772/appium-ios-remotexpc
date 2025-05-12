@@ -82,12 +82,7 @@ export function processPlistResponse(
 const RECORDS_DIR = path.join(process.cwd(), '../../.records');
 
 async function ensureRecordsDirectoryExists(): Promise<void> {
-  try {
-    await fs.promises.mkdir(RECORDS_DIR, { recursive: true, mode: 0o777 });
-  } catch (error) {
-    log.error(`Failed to create directory ${RECORDS_DIR}: ${error}`);
-    throw error;
-  }
+  await fs.promises.mkdir(RECORDS_DIR, { recursive: true, mode: 0o777 });
 }
 
 /**

@@ -46,34 +46,44 @@ export async function startCoreDeviceProxy(
   log.debug(`Connecting to CoreDeviceProxy service on port: ${response.Port}`);
 
   const usbmux = await createUsbmux();
+  try {
+    const pairRecord = await usbmux.readPairRecord(udid);
+    if (
+      !pairRecord ||
+      !pairRecord.HostCertificate ||
+      !pairRecord.HostPrivateKey
+    ) {
+      throw new Error(
+        'Missing required pair record or certificates for TLS upgrade',
+      );
+    }
 
-  const pairRecord = await usbmux.readPairRecord(udid);
-  if (
-    !pairRecord ||
-    !pairRecord.HostCertificate ||
-    !pairRecord.HostPrivateKey
-  ) {
-    throw new Error(
-      'Missing required pair record or certificates for TLS upgrade',
+    const coreDeviceSocket = await usbmux.connect(
+      Number(deviceID),
+      Number(response.Port),
     );
+
+    log.debug('Socket connected to CoreDeviceProxy, upgrading to TLS...');
+
+    const fullTlsOptions = {
+      ...tlsOptions,
+      cert: pairRecord.HostCertificate,
+      key: pairRecord.HostPrivateKey,
+    };
+
+    const tlsSocket = await upgradeSocketToTLS(
+      coreDeviceSocket,
+      fullTlsOptions,
+    );
+
+    const plistService = new PlistService(tlsSocket);
+
+    return { socket: tlsSocket, plistService };
+  } catch (err) {
+    // If we haven't connected yet, we can safely close the usbmux
+    await usbmux
+      .close()
+      .catch((closeErr) => log.error(`Error closing usbmux: ${closeErr}`));
+    throw err;
   }
-
-  const coreDeviceSocket = await usbmux.connect(
-    Number(deviceID),
-    Number(response.Port),
-  );
-
-  log.debug('Socket connected to CoreDeviceProxy, upgrading to TLS...');
-
-  const fullTlsOptions = {
-    ...tlsOptions,
-    cert: pairRecord.HostCertificate,
-    key: pairRecord.HostPrivateKey,
-  };
-
-  const tlsSocket = await upgradeSocketToTLS(coreDeviceSocket, fullTlsOptions);
-
-  const plistService = new PlistService(tlsSocket);
-
-  return { socket: tlsSocket, plistService };
 }

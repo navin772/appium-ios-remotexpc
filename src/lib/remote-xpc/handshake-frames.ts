@@ -124,7 +124,7 @@ function rawDataRepr(data: Buffer | null | undefined): string {
   }
   let r = data.toString('hex');
   if (r.length > 20) {
-    r = r.slice(0, 20) + '...';
+    r = r.slice(0, 20) + '\u2026';
   }
   return '<hex:' + r + '>';
 }
