@@ -1,0 +1,38 @@
+# Dependabot configuration file
+# See: https://docs.github.com/github/administering-a-repository/configuration-options-for-dependency-updates
+
+version: 2
+updates:
+  # Enable npm dependency updates
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    # Specify which branches to update
+    target-branch: "main"
+    # Set version update strategy
+    versioning-strategy: "auto"
+    # Set review requirements
+    open-pull-requests-limit: 10
+    # Group all dev dependencies together
+    groups:
+      dev-dependencies:
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "@types/*"  # Keep type definitions separate
+    # Labels for pull requests
+    labels:
+      - "dependencies"
+      - "npm"
+
+  # Enable GitHub Actions updates
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    target-branch: "main"
+    # Labels for pull requests
+    labels:
+      - "dependencies"
+      - "github-actions"

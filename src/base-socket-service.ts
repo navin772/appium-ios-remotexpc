@@ -35,7 +35,7 @@ class BaseSocketService extends EventEmitter {
     });
   }
 
-  _assignClientFailureHandlers(...sourceStreams: Readable[]) {
+  _assignClientFailureHandlers(...sourceStreams: Readable[]): void {
     for (const evt of ['close', 'end']) {
       this._socketClient.once(evt, () => {
         sourceStreams.map((s) => {
@@ -45,7 +45,7 @@ class BaseSocketService extends EventEmitter {
     }
   }
 
-  close() {
+  close(): void {
     if (!this._socketClient.destroyed) {
       this._socketClient.end();
     }

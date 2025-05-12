@@ -70,6 +70,17 @@ npm install
 npm run build
 ```
 
+### Continuous Integration
+
+This project uses GitHub Actions for continuous integration and Dependabot for dependency management:
+
+- **Lint and Build**: Automatically runs linting and builds the project on Node.js LTS.
+- **Format Check**: Ensures code formatting adheres to project standards
+- **Test Validation**: Validates that test files compile correctly (actual tests require physical devices)
+- **Dependabot**: Automatically creates PRs for dependency updates weekly
+
+All pull requests must pass these checks before merging. The workflows are defined in the `.github/workflows` directory.
+
 ### Scripts
 
 - `npm run build` - Clean and build the project

@@ -1,40 +1,20 @@
 import { Socket } from 'node:net';
 
-import { PlistService } from './lib/Plist/plist-service.js';
+import {
+  PlistService,
+  type PlistServiceOptions,
+} from './lib/plist/plist-service.js';
+import type { PlistDictionary } from './lib/types.js';
 
 /**
  * Message type for plist communications
  */
-type PlistMessage = Record<string, unknown>;
+type PlistMessage = PlistDictionary;
 
 /**
  * Base class for services that use PlistService for communication
  */
 export abstract class BasePlistService {
-  /**
-   * Closes the underlying connection
-   */
-  public close(): void {
-    this._plistService.close();
-  }
-
-  /**
-   * The underlying PlistService instance
-   */
-  protected _plistService: PlistService;
-
-  /**
-   * Creates a new BasePlistService
-   * @param plistServiceOrSocket
-   */
-  protected constructor(plistServiceOrSocket: PlistService | Socket) {
-    if (plistServiceOrSocket instanceof PlistService) {
-      this._plistService = plistServiceOrSocket;
-    } else {
-      this._plistService = new PlistService(plistServiceOrSocket);
-    }
-  }
-
   /**
    * Sends a message and waits for a response
    * @param message The message to send
@@ -46,6 +26,42 @@ export abstract class BasePlistService {
     timeout?: number,
   ): Promise<PlistMessage> {
     return this._plistService.sendPlistAndReceive(message, timeout);
+  }
+
+  /**
+   * Closes the underlying connection
+   */
+  public close(): void {
+    this._plistService.close();
+  }
+
+  /**
+   * Gets the PlistService instance
+   * @returns The PlistService instance
+   */
+  protected getPlistService(): PlistService {
+    return this._plistService;
+  }
+
+  /**
+   * The underlying PlistService instance
+   */
+  protected _plistService: PlistService;
+
+  /**
+   * Creates a new BasePlistService
+   * @param plistServiceOrSocket PlistService instance or Socket
+   * @param options Configuration options for PlistService
+   */
+  protected constructor(
+    plistServiceOrSocket: PlistService | Socket,
+    options: PlistServiceOptions = {},
+  ) {
+    if (plistServiceOrSocket instanceof PlistService) {
+      this._plistService = plistServiceOrSocket;
+    } else {
+      this._plistService = new PlistService(plistServiceOrSocket, options);
+    }
   }
 
   /**
