@@ -3,11 +3,17 @@ import { Socket } from 'net';
 import { TLSSocket } from 'tls';
 
 import type { PlistDictionary } from '../types.js';
-import LengthBasedSplitter from './length-based-splitter.js';
-import PlistServiceDecoder from './plist-decoder.js';
-import PlistServiceEncoder from './plist-encoder.js';
+import { LengthBasedSplitter } from './length-based-splitter.js';
+import { PlistServiceDecoder } from './plist-decoder.js';
+import { PlistServiceEncoder } from './plist-encoder.js';
 
 const log = logger.getLogger('Plist');
+const errorLog = logger.getLogger('PlistError');
+
+const config = {
+  verboseErrorLogging: false,
+};
+
 /**
  * Message type for plist communications
  */
@@ -24,6 +30,29 @@ export interface PlistServiceOptions {
  * Service for communication using plist protocol
  */
 export class PlistService {
+  /**
+   * Enable verbose error logging
+   */
+  static enableVerboseErrorLogging(): void {
+    config.verboseErrorLogging = true;
+    errorLog.debug('Verbose plist error logging enabled');
+  }
+
+  /**
+   * Disable verbose error logging
+   */
+  static disableVerboseErrorLogging(): void {
+    config.verboseErrorLogging = false;
+  }
+
+  /**
+   * Check if verbose error logging is enabled
+   * @returns True if verbose error logging is enabled
+   */
+  static isVerboseErrorLoggingEnabled(): boolean {
+    return config.verboseErrorLogging;
+  }
+
   /**
    * Gets the underlying socket
    * @returns The socket used by this service
@@ -130,12 +159,33 @@ export class PlistService {
    */
   public close(): void {
     try {
+      // Remove all data listeners to prevent parsing during close
+      this._splitter.removeAllListeners();
+      this._decoder.removeAllListeners();
+
+      // Clear the message queue to prevent processing during close
+      this._messageQueue = [];
+
+      // Unpipe the transformers to prevent data flow during close
+      try {
+        this._socket.unpipe(this._splitter);
+        this._splitter.unpipe(this._decoder);
+      } catch (unpipeError) {
+        log.debug(
+          `Non-critical error during unpipe: ${unpipeError instanceof Error ? unpipeError.message : String(unpipeError)}`,
+        );
+      }
+
+      // End the socket
       this._socket.end();
     } catch (error) {
       // Log the error but don't rethrow it to ensure cleanup completes
       log.error(
         `Error closing socket: ${error instanceof Error ? error.message : String(error)}`,
       );
+
+      // If ending fails, destroy the socket
+      this._socket.destroy();
     }
   }
 
@@ -163,6 +213,21 @@ export class PlistService {
    * @param error The error that occurred
    */
   private handleError(error: Error): void {
-    log.error(`PlistService Error: ${error.message}`);
+    // Only log detailed errors if verbose logging is enabled
+    if (!config.verboseErrorLogging) {
+      return;
+    }
+
+    errorLog.debug(`PlistService Error: ${error.message}`);
+
+    // If this is an XML parsing error, it might be a binary plist
+    if (
+      error.message.includes('Invalid XML') ||
+      error.message.includes('XML parsing')
+    ) {
+      errorLog.debug(
+        'This might be a binary plist with a non-standard format',
+      );
+    }
   }
 }

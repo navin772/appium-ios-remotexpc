@@ -1,55 +1,76 @@
+import { logger } from '@appium/support';
 import { DOMParser, Element, Node } from '@xmldom/xmldom';
 
 import type { PlistArray, PlistDictionary, PlistValue } from '../types.js';
+import { PlistService } from './plist-service.js';
+import {
+  cleanXmlWithReplacementChar,
+  ensureString,
+  findFirstReplacementCharacter,
+  fixMultipleXmlDeclarations,
+  hasUnicodeReplacementCharacter,
+  isValidXml,
+  removeExtraContentAfterPlist,
+  trimBeforeXmlDeclaration,
+} from './utils.js';
+
+const errorLog = logger.getLogger('PlistError');
 
 /**
  * Parses an XML plist string into a JavaScript object
+ *
  * @param xmlData - XML plist data as string or Buffer
- * @returns - Parsed JavaScript object
+ * @returns Parsed JavaScript object
  */
 export function parsePlist(xmlData: string | Buffer): PlistDictionary {
-  let xmlStr = xmlData instanceof Buffer ? xmlData.toString('utf8') : xmlData;
+  let xmlStr = ensureString(xmlData);
 
-  // Find the XML declaration
-  const xmlDeclIndex = xmlStr.indexOf('<?xml');
-  if (xmlDeclIndex > 0) {
-    // There's content before the XML declaration, remove it
-    xmlStr = xmlStr.slice(xmlDeclIndex);
+  xmlStr = trimBeforeXmlDeclaration(xmlStr);
+
+  if (hasUnicodeReplacementCharacter(xmlStr)) {
+    const badCharPos = findFirstReplacementCharacter(xmlStr);
+    xmlStr = cleanXmlWithReplacementChar(xmlStr, badCharPos);
   }
 
-  // Check for Unicode replacement characters which might indicate encoding issues
-  if (xmlStr.includes('�')) {
-    // Find the position of the first replacement character
-    const badCharPos = xmlStr.indexOf('�');
-    const startPos = Math.max(0, badCharPos - 20);
-    const endPos = Math.min(xmlStr.length, badCharPos + 20);
-    const problematicSection = xmlStr.slice(startPos, endPos);
-
-    // Remove the replacement character and anything before it if it's at the start
-    if (badCharPos < 10) {
-      // Use a regex to remove anything before the first '<' character
-      const firstTagIndex = xmlStr.indexOf('<');
-      if (firstTagIndex > 0) {
-        xmlStr = xmlStr.slice(firstTagIndex);
-      }
+  if (!isValidXml(xmlStr)) {
+    if (PlistService.isVerboseErrorLoggingEnabled()) {
+      errorLog.debug(
+        `Invalid XML: missing root element - XML content: ${xmlStr.substring(0, 200)}...`,
+      );
     }
+    throw new Error('Invalid XML: missing root element or malformed XML');
   }
 
-  // Check if the string is empty or not XML
-  if (
-    !xmlStr ||
-    !xmlStr.toString().trim() ||
-    !xmlStr.toString().includes('<')
-  ) {
-    throw new Error('Invalid XML: missing root element');
-  }
+  xmlStr = fixMultipleXmlDeclarations(xmlStr);
 
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(xmlStr.toString(), 'text/xml');
+  xmlStr = removeExtraContentAfterPlist(xmlStr);
+
+  const parser = new DOMParser({
+    errorHandler(level, message) {
+      if (level === 'fatalError') {
+        throw new Error(`Fatal XML parsing error: ${message}`);
+      }
+      return true;
+    },
+  });
+
+  const doc = parser.parseFromString(xmlStr, 'text/xml');
 
   if (!doc) {
     throw new Error('Invalid XML response');
   }
+
+  const plistElements = doc.getElementsByTagName('plist');
+  if (plistElements.length === 0) {
+    throw new Error('No plist element found in XML');
+  }
+
+  const rootDict = doc.getElementsByTagName('dict')[0];
+  if (!rootDict) {
+    return {};
+  }
+
+  return parseDict(rootDict);
 
   function parseNode(node: Element): PlistValue {
     if (!node) {
@@ -74,16 +95,14 @@ export function parsePlist(xmlData: string | Buffer): PlistDictionary {
       case 'date':
         return new Date(node.textContent || '');
       case 'data':
-        // Convert base64 to Buffer for binary data
-        if (node.textContent) {
-          try {
-            return Buffer.from(node.textContent, 'base64');
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          } catch (e) {
-            return node.textContent;
-          }
+        if (!node.textContent) {
+          return null;
         }
-        return null;
+        try {
+          return Buffer.from(node.textContent, 'base64');
+        } catch {
+          return node.textContent;
+        }
       default:
         return node.textContent || null;
     }
@@ -95,14 +114,13 @@ export function parsePlist(xmlData: string | Buffer): PlistDictionary {
 
     for (let i = 0; i < keys.length; i++) {
       const keyName = keys[i].textContent || '';
-      let valueNode = keys[i].nextSibling as Node | null;
+      let valueNode = keys[i].nextSibling;
 
-      // Skip text nodes (whitespace)
-      while (valueNode && valueNode.nodeType !== 1) {
+      while (valueNode && valueNode.nodeType !== Node.ELEMENT_NODE) {
         valueNode = valueNode.nextSibling;
       }
 
-      if (valueNode && valueNode.nodeType === 1) {
+      if (valueNode) {
         obj[keyName] = parseNode(valueNode as Element);
       }
     }
@@ -115,8 +133,7 @@ export function parsePlist(xmlData: string | Buffer): PlistDictionary {
     let childNode = arrayNode.firstChild;
 
     while (childNode) {
-      if (childNode.nodeType === 1) {
-        // Element node
+      if (childNode.nodeType === Node.ELEMENT_NODE) {
         result.push(parseNode(childNode as Element));
       }
       childNode = childNode.nextSibling;
@@ -124,14 +141,4 @@ export function parsePlist(xmlData: string | Buffer): PlistDictionary {
 
     return result;
   }
-
-  // Find the root dictionary
-  const rootDict = doc.getElementsByTagName('dict')[0];
-  if (rootDict) {
-    return parseDict(rootDict);
-  }
-
-  throw new Error('Unable to find root dictionary in plist');
 }
-
-export default parsePlist;

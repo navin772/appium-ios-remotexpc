@@ -43,6 +43,8 @@ class Writer {
     const buf = Buffer.alloc(8);
     if (typeof value === 'bigint') {
       buf.writeBigUInt64LE(value, 0);
+    } else {
+      buf.writeBigUInt64LE(BigInt(value), 0);
     }
     this.writeBuffer(buf);
   }
@@ -328,7 +330,7 @@ function decodeObject(reader: Reader): XPCValue {
     case XPC_TYPES.bool: {
       const b = reader.readByte();
       reader.skip(3);
-      return !!b;
+      return Boolean(b);
     }
     case XPC_TYPES.int64:
       return Number(reader.readBigInt64LE());
