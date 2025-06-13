@@ -136,14 +136,14 @@ export function escapeXml(str: string): string {
         return '&amp;';
       case '"':
         return '&quot;';
-      case '\'':
+      // eslint-disable-next-line quotes -- Prettier uses double quotes here to avoid escaping the single quote character
+      case `'`:
         return '&apos;';
       default:
         return c;
     }
   });
 }
-
 
 /**
  * Checks if the data contains XML plist content by detecting XML declaration or plist tags
@@ -152,8 +152,10 @@ export function escapeXml(str: string): string {
  * @returns True if the data contains XML plist content, false otherwise
  */
 export function isXmlPlistContent(data: string | Buffer): boolean {
-  const strData = typeof data === 'string' ? data : data.toString(UTF8_ENCODING);
-  return strData.includes('<?xml') || strData.includes('<plist');
+  return (
+    data.toString(UTF8_ENCODING).includes('<?xml') ||
+    data.toString(UTF8_ENCODING).includes('<plist')
+  );
 }
 
 /**
