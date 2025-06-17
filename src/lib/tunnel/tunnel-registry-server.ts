@@ -1,38 +1,69 @@
 import { logger } from '@appium/support';
-import express from 'express';
-import type { NextFunction, Request, Response } from 'express';
+import * as http from 'node:http';
+import { URL } from 'node:url';
 
+import type { TunnelRegistry, TunnelRegistryEntry } from '../types.js';
+
+// Constants
+const DEFAULT_TUNNEL_REGISTRY_PORT = 42314;
+const API_BASE_PATH = '/remotexpc/tunnels';
+
+// Logger instance
 const log = logger.getLogger('TunnelRegistryServer');
 
-export interface TunnelRegistryEntry {
-  udid: string;
-  deviceId: number;
-  address: string;
-  rsdPort: number;
-  packetStreamPort?: number;
-  connectionType: string;
-  productId: number;
-  createdAt: number;
-  lastUpdated: number;
+// Helper functions
+/**
+ * Parse JSON body from HTTP request
+ */
+async function parseJSONBody<T = unknown>(
+  req: http.IncomingMessage,
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    req.on('data', (chunk) => {
+      body += chunk.toString();
+    });
+    req.on('end', () => {
+      try {
+        resolve(body ? JSON.parse(body) : {});
+      } catch (error) {
+        reject(error);
+      }
+    });
+    req.on('error', reject);
+  });
 }
 
-export interface TunnelRegistry {
-  tunnels: Record<string, TunnelRegistryEntry>;
-  metadata: {
-    lastUpdated: string;
-    totalTunnels: number;
-    activeTunnels: number;
-  };
+/**
+ * Send JSON response
+ */
+function sendJSON(
+  res: http.ServerResponse,
+  statusCode: number,
+  data: unknown,
+): void {
+  const statusText = http.STATUS_CODES[statusCode] || '';
+  let responseBody;
+  if (data && typeof data === 'object' && data !== null) {
+    if ('error' in data) {
+      responseBody = { status: statusText, ...data };
+    } else {
+      responseBody = { status: statusText, ...data };
+    }
+  } else {
+    responseBody = { status: statusText, data };
+  }
+  res.writeHead(statusCode, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify(responseBody));
 }
 
 /**
  * Tunnel Registry Server - provides API endpoints for tunnel registry operations
  */
 export class TunnelRegistryServer {
-  private app: express.Application;
-  private server: any;
+  private server?: http.Server;
   public port: number;
-  public tunnelsInfo: any;
+  public tunnelsInfo?: TunnelRegistry;
   private registry: TunnelRegistry = {
     tunnels: {},
     metadata: {
@@ -44,133 +75,207 @@ export class TunnelRegistryServer {
 
   /**
    * Create a new TunnelRegistryServer
+   * @param tunnelsInfo - Registry data object
    * @param port - Port to listen on
-   * @param tunnelsInfo - Path to the registry file
    */
-  constructor(tunnelsInfo: string | undefined, port: number = 4723) {
+  constructor(tunnelsInfo: TunnelRegistry | undefined, port: number) {
     this.port = port;
     this.tunnelsInfo = tunnelsInfo;
-    this.app = express();
-    this.setupMiddleware();
-    this.setupRoutes();
+  }
+
+  /**
+   * Get tunnels from registry
+   */
+  private get tunnels(): Record<string, TunnelRegistryEntry> {
+    return this.registry.tunnels;
+  }
+
+  /**
+   * Get auto-calculated metadata
+   */
+  private get metadata(): TunnelRegistry['metadata'] {
+    const tunnelCount = Object.keys(this.tunnels).length;
+    return {
+      lastUpdated: new Date().toISOString(),
+      totalTunnels: tunnelCount,
+      activeTunnels: tunnelCount, // Assuming all tunnels are active
+    };
+  }
+
+  /**
+   * Get a complete registry with tunnels and metadata
+   */
+  private get fullRegistry(): TunnelRegistry {
+    return {
+      tunnels: this.tunnels,
+      metadata: this.metadata,
+    };
   }
 
   /**
    * Start the server
    */
   async start(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      try {
-        // Load the registry first
-        this.loadRegistry()
-          .then(() => {
-            // Start the server
-            this.server = this.app.listen(this.port, () => {
-              log.info(`Tunnel Registry Server started on port ${this.port}`);
-              log.info(
-                `API available at http://localhost:${this.port}/remotexpc/tunnels`,
-              );
-              resolve();
-            });
-            return undefined; // Return a value to satisfy the linter
-          })
-          .catch((error) => {
-            log.error(`Failed to load registry: ${error}`);
-            reject(error);
-          });
-      } catch (error) {
-        log.error(`Failed to start server: ${error}`);
-        reject(error);
-      }
-    });
+    try {
+      // Load the registry first
+      await this.loadRegistry();
+
+      // Create HTTP server with request handler
+      this.server = http.createServer(async (req, res) => {
+        await this.handleRequest(req, res);
+      });
+
+      // Start listening
+      await new Promise<void>((resolve, reject) => {
+        this.server?.listen(this.port, () => {
+          log.info(`Tunnel Registry Server started on port ${this.port}`);
+          log.info(
+            `API available at http://localhost:${this.port}${API_BASE_PATH}`,
+          );
+          resolve();
+        });
+
+        // Handle server errors
+        this.server?.on('error', (error) => {
+          log.error(`Server error: ${error}`);
+          reject(error);
+        });
+      });
+    } catch (error) {
+      log.error(`Failed to start server: ${error}`);
+      throw error;
+    }
   }
 
   /**
    * Stop the server
    */
   async stop(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      if (!this.server) {
-        log.warn('Server not running');
-        return resolve();
+    if (!this.server) {
+      log.warn('Server not running');
+      return;
+    }
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        this.server?.close((error?: Error) => {
+          if (error) {
+            reject(error);
+          } else {
+            resolve();
+          }
+        });
+      });
+      log.info('Tunnel Registry Server stopped');
+    } catch (error) {
+      log.error(`Error stopping server: ${error}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Main request handler
+   */
+  private async handleRequest(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+  ): Promise<void> {
+    const url = new URL(req.url || '', `http://localhost:${this.port}`);
+    const method = req.method || 'GET';
+    const pathname = url.pathname;
+
+    // Log the request
+    log.debug(`${method} ${pathname}`);
+
+    // Match routes
+    const basePath = API_BASE_PATH;
+
+    try {
+      // GET /remotexpc/tunnels - Get all tunnels
+      if (method === 'GET' && pathname === basePath) {
+        await this.getAllTunnels(res);
+        return;
       }
 
-      this.server.close((error: Error) => {
-        if (error) {
-          log.error(`Error stopping server: ${error}`);
-          return reject(error);
-        }
-        log.info('Tunnel Registry Server stopped');
-        resolve();
+      // GET /remotexpc/tunnels/device/:deviceId - Get tunnel by device ID
+      const deviceMatch = pathname.match(
+        new RegExp(`^${basePath}/device/(.+)$`),
+      );
+      if (method === 'GET' && deviceMatch) {
+        const deviceIdStr = deviceMatch[1];
+        const deviceId = parseInt(deviceIdStr, 10);
+        await this.getTunnelByDeviceId(res, deviceId);
+        return;
+      }
+
+      // GET /remotexpc/tunnels/:udid - Get tunnel by UDID
+      const udidMatch = pathname.match(new RegExp(`^${basePath}/([^/]+)$`));
+      if (
+        method === 'GET' &&
+        udidMatch &&
+        !udidMatch[1].startsWith('device/')
+      ) {
+        const udid = udidMatch[1];
+        await this.getTunnelByUdid(res, udid);
+        return;
+      }
+
+      // PUT /remotexpc/tunnels/:udid - Update tunnel
+      if (method === 'PUT' && udidMatch) {
+        const udid = udidMatch[1];
+        await this.updateTunnel(req, res, udid);
+        return;
+      }
+
+      // No route matched
+      sendJSON(res, 404, { error: 'Not found' });
+    } catch (error) {
+      log.error(`Request handling error: ${error}`);
+      sendJSON(res, 500, {
+        error: 'Internal server error',
       });
-    });
-  }
-
-  /**
-   * Setup middleware for the Express app
-   */
-  private setupMiddleware(): void {
-    this.app.use(express.json());
-    this.app.use((req: Request, res: Response, next: NextFunction) => {
-      log.debug(`${req.method} ${req.path}`);
-      next();
-    });
-  }
-
-  /**
-   * Setup routes for the Express app
-   */
-  private setupRoutes(): void {
-    // Base path for the API
-    const basePath = '/remotexpc/tunnels';
-
-    // Get all tunnels
-    this.app.get(basePath, this.getAllTunnels.bind(this));
-
-    // Get a specific tunnel by UDID
-    this.app.get(`${basePath}/:udid`, this.getTunnelByUdid.bind(this));
-
-    // Get a specific tunnel by device ID
-    this.app.get(
-      `${basePath}/device/:deviceId`,
-      this.getTunnelByDeviceId.bind(this),
-    );
-
-    // Create or update a tunnel
-    this.app.put(`${basePath}/:udid`, this.updateTunnel.bind(this));
+    }
   }
 
   /**
    * Handler for getting all tunnels
    */
-  private async getAllTunnels(req: Request, res: Response): Promise<void> {
+  private async getAllTunnels(res: http.ServerResponse): Promise<void> {
     try {
       await this.loadRegistry();
-      res.json(this.registry);
+      sendJSON(res, 200, this.fullRegistry);
     } catch (error) {
       log.error(`Error getting all tunnels: ${error}`);
-      res.status(500).json({ error: 'Failed to get tunnels' });
+      sendJSON(res, 500, {
+        error: 'Failed to get tunnels',
+      });
     }
   }
 
   /**
    * Handler for getting a tunnel by UDID
    */
-  private async getTunnelByUdid(req: Request, res: Response): Promise<void> {
+  private async getTunnelByUdid(
+    res: http.ServerResponse,
+    udid: string,
+  ): Promise<void> {
     try {
       await this.loadRegistry();
-      const { udid } = req.params;
-      const tunnel = this.registry.tunnels[udid];
+      const tunnel = this.tunnels[udid];
 
       if (!tunnel) {
-        res.status(404).json({ error: `Tunnel not found for UDID: ${udid}` });
+        sendJSON(res, 404, {
+          error: `Tunnel not found for UDID: ${udid}`,
+        });
         return;
       }
 
-      res.json(tunnel);
+      sendJSON(res, 200, tunnel);
     } catch (error) {
       log.error(`Error getting tunnel by UDID: ${error}`);
-      res.status(500).json({ error: 'Failed to get tunnel' });
+      sendJSON(res, 500, {
+        error: 'Failed to get tunnel',
+      });
     }
   }
 
@@ -178,53 +283,72 @@ export class TunnelRegistryServer {
    * Handler for getting a tunnel by device ID
    */
   private async getTunnelByDeviceId(
-    req: Request,
-    res: Response,
+    res: http.ServerResponse,
+    deviceId: number,
   ): Promise<void> {
     try {
       await this.loadRegistry();
-      const deviceId = parseInt(req.params.deviceId, 10);
 
       if (isNaN(deviceId)) {
-        res.status(400).json({ error: 'Invalid device ID' });
+        sendJSON(res, 400, { error: 'Invalid device ID' });
         return;
       }
 
-      const tunnel = Object.values(this.registry.tunnels).find(
+      const tunnel = Object.values(this.tunnels).find(
         (t) => t.deviceId === deviceId,
       );
 
       if (!tunnel) {
-        res
-          .status(404)
-          .json({ error: `Tunnel not found for device ID: ${deviceId}` });
+        sendJSON(res, 404, {
+          error: `Tunnel not found for device ID: ${deviceId}`,
+        });
         return;
       }
 
-      res.json(tunnel);
+      sendJSON(res, 200, tunnel);
     } catch (error) {
       log.error(`Error getting tunnel by device ID: ${error}`);
-      res.status(500).json({ error: 'Failed to get tunnel' });
+      sendJSON(res, 500, {
+        error: 'Failed to get tunnel',
+      });
     }
   }
 
   /**
    * Handler for updating a tunnel
    */
-  private async updateTunnel(req: Request, res: Response): Promise<void> {
+  private async updateTunnel(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    udid: string,
+  ): Promise<void> {
     try {
       await this.loadRegistry();
-      const { udid } = req.params;
-      const tunnelData = req.body as TunnelRegistryEntry;
+      let tunnelData: TunnelRegistryEntry | null = null;
+      try {
+        tunnelData = await parseJSONBody<TunnelRegistryEntry>(req);
+      } catch (parseError: unknown) {
+        const errorMessage =
+          parseError instanceof Error ? parseError.message : String(parseError);
+        log.error(`Failed to parse JSON body: ${errorMessage}`);
+        sendJSON(res, 400, {
+          error: 'Malformed JSON in request body',
+        });
+        return;
+      }
 
       if (!tunnelData || typeof tunnelData !== 'object') {
-        res.status(400).json({ error: 'Invalid tunnel data' });
+        sendJSON(res, 400, {
+          error: 'Invalid tunnel data',
+        });
         return;
       }
 
       // Ensure the UDID in the path matches the one in the body
       if (tunnelData.udid !== udid) {
-        res.status(400).json({ error: 'UDID mismatch between path and body' });
+        sendJSON(res, 400, {
+          error: 'UDID mismatch between path and body',
+        });
         return;
       }
 
@@ -234,39 +358,30 @@ export class TunnelRegistryServer {
         lastUpdated: Date.now(),
       };
 
-      // Update metadata
-      this.updateMetadata();
-
-      res.json({ success: true, tunnel: this.registry.tunnels[udid] });
+      sendJSON(res, 200, {
+        success: true,
+        tunnel: this.registry.tunnels[udid],
+      });
     } catch (error) {
       log.error(`Error updating tunnel: ${error}`);
-      res.status(500).json({ error: 'Failed to update tunnel' });
+      sendJSON(res, 500, {
+        error: 'Failed to update tunnel',
+      });
     }
   }
 
   /**
-   * Update the registry metadata
-   */
-  private updateMetadata(): void {
-    const tunnelCount = Object.keys(this.registry.tunnels).length;
-    this.registry.metadata = {
-      lastUpdated: new Date().toISOString(),
-      totalTunnels: tunnelCount,
-      activeTunnels: tunnelCount, // Assuming all tunnels are active
-    };
-  }
-
-  /**
-   * Load the registry from file
+   * Load the registry from provided data
    */
   private async loadRegistry(): Promise<void> {
     try {
       if (this.tunnelsInfo) {
-        this.registry = this.tunnelsInfo as TunnelRegistry;
+        this.registry = this.tunnelsInfo;
       }
+      // Use the provided registry object or default empty registry
     } catch (error) {
-      log.warn(`Failed to load registry from ${this.tunnelsInfo}: ${error}`);
-      // If the file doesn't exist or is invalid, use the default empty registry
+      log.warn(`Failed to load registry: ${error}`);
+      // If there's an error, use the default empty registry
       this.registry = {
         tunnels: {},
         metadata: {
@@ -281,13 +396,13 @@ export class TunnelRegistryServer {
 
 /**
  * Create and start a TunnelRegistryServer instance
+ * @param tunnelInfos - Registry data object
  * @param port - Port to listen on
- * @param registryPath - Path to the registry file
  * @returns The started TunnelRegistryServer instance
  */
 export async function startTunnelRegistryServer(
-  tunnelInfos: any,
-  port: number = 42314,
+  tunnelInfos: TunnelRegistry | undefined,
+  port: number = DEFAULT_TUNNEL_REGISTRY_PORT,
 ): Promise<TunnelRegistryServer> {
   const server = new TunnelRegistryServer(tunnelInfos, port);
   await server.start();
