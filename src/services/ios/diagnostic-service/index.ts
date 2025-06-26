@@ -1,7 +1,10 @@
 import { logger } from '@appium/support';
 
 import { PlistServiceDecoder } from '../../../lib/plist/plist-decoder.js';
-import type { PlistDictionary } from '../../../lib/types.js';
+import type {
+  DiagnosticsService as DiagnosticsServiceInterface,
+  PlistDictionary,
+} from '../../../lib/types.js';
 import { BaseService } from '../base-service.js';
 import { MobileGestaltKeys } from './keys.js';
 
@@ -13,75 +16,15 @@ const log = logger.getLogger('DiagnosticService');
  * - Reboot, shutdown or put the device in sleep mode
  * - Get WiFi information
  */
-class DiagnosticsService extends BaseService {
+class DiagnosticsService
+  extends BaseService
+  implements DiagnosticsServiceInterface
+{
   static readonly RSD_SERVICE_NAME =
     'com.apple.mobile.diagnostics_relay.shim.remote';
 
   constructor(address: [string, number]) {
     super(address);
-  }
-
-  /**
-   * Query MobileGestalt keys
-   * @param keys Array of keys to query, if not provided all keys will be queried
-   * @returns Object containing the queried keys and their values
-   */
-  async mobileGestalt(keys: string[] = []): Promise<PlistDictionary> {
-    try {
-      if (!keys || keys.length === 0) {
-        keys = MobileGestaltKeys;
-      }
-
-      const request: PlistDictionary = {
-        Request: 'MobileGestalt',
-        MobileGestaltKeys: keys,
-      };
-
-      const responseObj = await this.sendRequest(request);
-
-      if (!responseObj || typeof responseObj !== 'object') {
-        throw new Error('Invalid response from MobileGestalt');
-      }
-
-      log.debug(`MobileGestalt response: ${JSON.stringify(responseObj)}`);
-
-      if (
-        !responseObj.Diagnostics ||
-        typeof responseObj.Diagnostics !== 'object'
-      ) {
-        throw new Error('Invalid Diagnostics in MobileGestalt response');
-      }
-
-      const diagnostics = responseObj.Diagnostics as PlistDictionary;
-
-      if (
-        !diagnostics.MobileGestalt ||
-        typeof diagnostics.MobileGestalt !== 'object'
-      ) {
-        throw new Error('Invalid MobileGestalt in Diagnostics response');
-      }
-
-      const mobileGestalt = diagnostics.MobileGestalt as PlistDictionary;
-
-      if (mobileGestalt.Status === 'MobileGestaltDeprecated') {
-        throw new Error('MobileGestalt deprecated (iOS >= 17.4)');
-      }
-
-      if (
-        responseObj.Status !== 'Success' ||
-        mobileGestalt.Status !== 'Success'
-      ) {
-        throw new Error('Failed to query MobileGestalt');
-      }
-
-      const result = { ...mobileGestalt };
-      delete result.Status;
-
-      return result;
-    } catch (error) {
-      log.error(`Error querying MobileGestalt: ${error}`);
-      throw error;
-    }
   }
 
   /**
