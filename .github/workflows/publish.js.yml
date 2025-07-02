@@ -5,8 +5,9 @@ name: Release
 
 on:
   workflow_dispatch:
-  push:
-    branches: [ main ]
+  # disable automatic trigger for now
+  # push:
+  #   branches: [ main ]
 
 permissions:
   contents: write
