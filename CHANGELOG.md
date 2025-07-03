@@ -1,3 +1,9 @@
+## [0.0.3](https://github.com/appium/appium-ios-remotexpc/compare/v0.0.2...v0.0.3) (2025-07-03)
+
+### Miscellaneous Chores
+
+* add more permissions ([1933d7e](https://github.com/appium/appium-ios-remotexpc/commit/1933d7e1ce04fceeb90812ea62a2e8083c6d61ed))
+
 ## [0.0.2](https://github.com/appium/appium-ios-remotexpc/compare/v0.0.1...v0.0.2) (2025-07-03)
 
 ### Miscellaneous Chores
