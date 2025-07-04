@@ -1,3 +1,9 @@
+## [0.0.5](https://github.com/appium/appium-ios-remotexpc/compare/v0.0.4...v0.0.5) (2025-07-04)
+
+### Miscellaneous Chores
+
+* add appletv encryption module for RemoteXPC support ([#50](https://github.com/appium/appium-ios-remotexpc/issues/50)) ([0e5f3c6](https://github.com/appium/appium-ios-remotexpc/commit/0e5f3c6064bb0dc02f05f9349bac942c4c3bc951))
+
 ## [0.0.4](https://github.com/appium/appium-ios-remotexpc/compare/v0.0.3...v0.0.4) (2025-07-03)
 
 ### Miscellaneous Chores
