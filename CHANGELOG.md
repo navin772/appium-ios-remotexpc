@@ -1,3 +1,9 @@
+## [0.1.0](https://github.com/appium/appium-ios-remotexpc/compare/v0.0.6...v0.1.0) (2025-07-05)
+
+### Features
+
+* add SRP implementation for Apple TV authentication ([#51](https://github.com/appium/appium-ios-remotexpc/issues/51)) ([4cc8c4e](https://github.com/appium/appium-ios-remotexpc/commit/4cc8c4ef92a689306a903bcc8dd5cfad5b024d7b))
+
 ## [0.0.6](https://github.com/appium/appium-ios-remotexpc/compare/v0.0.5...v0.0.6) (2025-07-05)
 
 ### Bug Fixes
