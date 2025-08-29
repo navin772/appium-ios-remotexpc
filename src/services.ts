@@ -5,10 +5,12 @@ import { TunnelManager } from './lib/tunnel/index.js';
 import { TunnelApiClient } from './lib/tunnel/tunnel-api-client.js';
 import type {
   DiagnosticsServiceWithConnection,
+  HeartbeatServiceWithConnection,
   NotificationProxyServiceWithConnection,
   SyslogService as SyslogServiceType,
 } from './lib/types.js';
 import DiagnosticsService from './services/ios/diagnostic-service/index.js';
+import { HeartbeatService } from './services/ios/heartbeat/index.js';
 import { NotificationProxyService } from './services/ios/notification-proxy/index.js';
 import SyslogService from './services/ios/syslog-service/index.js';
 
@@ -43,6 +45,22 @@ export async function startNotificationProxyService(
     notificationProxyService: new NotificationProxyService([
       tunnelConnection.host,
       parseInt(notificationProxyService.port, 10),
+    ]),
+  };
+}
+
+export async function startHeartbeatService(
+  udid: string,
+): Promise<HeartbeatServiceWithConnection> {
+  const { remoteXPC, tunnelConnection } = await createRemoteXPCConnection(udid);
+  const heartbeatService = remoteXPC.findService(
+    HeartbeatService.RSD_SERVICE_NAME,
+  );
+  return {
+    remoteXPC: remoteXPC as RemoteXpcConnection,
+    heartbeatService: new HeartbeatService([
+      tunnelConnection.host,
+      parseInt(heartbeatService.port, 10),
     ]),
   };
 }

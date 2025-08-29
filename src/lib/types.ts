@@ -213,6 +213,54 @@ export interface NotificationProxyService extends BaseService {
 }
 
 /**
+ * Represents the HeartbeatService interface for connection keep-alive
+ */
+export interface HeartbeatService extends BaseService {
+  /**
+   * Start the heartbeat service and establish connection
+   * @returns Promise that resolves when the connection is established
+   */
+  start(): Promise<void>;
+  /**
+   * Stop the heartbeat service
+   * @returns Promise that resolves when the service is stopped
+   */
+  stop(): Promise<void>;
+  /**
+   * Send a heartbeat response (Polo command) after receiving Marco
+   * @returns Promise that resolves when the Polo response is sent
+   */
+  sendPolo(): Promise<void>;
+  /**
+   * Wait for any message from iOS and send Polo response
+   * @returns Promise that resolves with the message received from iOS
+   */
+  waitForMessageAndSendPolo(): Promise<PlistDictionary>;
+  /**
+   * Start heartbeat monitoring with automatic interval
+   * @param interval Interval in seconds between heartbeats
+   * @returns AsyncGenerator yielding heartbeat responses
+   */
+  monitorHeartbeat(interval?: number): AsyncGenerator<PlistMessage>;
+  /**
+   * Wait for a single heartbeat response
+   * @param timeout Timeout in milliseconds
+   * @returns Promise resolving to the heartbeat response
+   */
+  waitForHeartbeat(timeout?: number): Promise<PlistMessage>;
+  /**
+   * Check if the heartbeat service is running
+   * @returns Boolean indicating if the service is active
+   */
+  isRunning(): boolean;
+  /**
+   * Connect to the heartbeat service
+   * @returns Promise resolving to the ServiceConnection instance
+   */
+  connectToHeartbeatService(): Promise<ServiceConnection>;
+}
+
+/**
  * Represents the static side of DiagnosticsService
  */
 export interface DiagnosticsServiceConstructor {
@@ -245,6 +293,17 @@ export interface DiagnosticsServiceWithConnection {
 export interface NotificationProxyServiceWithConnection {
   /** The NotificationProxyService instance */
   notificationProxyService: NotificationProxyService;
+  /** The RemoteXPC connection that can be used to close the connection */
+  remoteXPC: RemoteXpcConnection;
+}
+
+/**
+ * Represents a HeartbeatService instance with its associated RemoteXPC connection
+ * This allows callers to properly manage the connection lifecycle
+ */
+export interface HeartbeatServiceWithConnection {
+  /** The HeartbeatService instance */
+  heartbeatService: HeartbeatService;
   /** The RemoteXPC connection that can be used to close the connection */
   remoteXPC: RemoteXpcConnection;
 }
