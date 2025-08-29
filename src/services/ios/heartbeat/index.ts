@@ -20,7 +20,10 @@ export interface HeartbeatRequest extends PlistDictionary {
  * - Send heartbeat requests (Polo commands)
  * - Receive heartbeat responses for connection monitoring
  */
-class HeartbeatService extends BaseService implements HeartbeatServiceInterface {
+class HeartbeatService
+  extends BaseService
+  implements HeartbeatServiceInterface
+{
   static readonly RSD_SERVICE_NAME = 'com.apple.mobile.heartbeat.shim.remote';
   private readonly timeout: number;
   private _conn: ServiceConnection | null = null;
@@ -64,7 +67,7 @@ class HeartbeatService extends BaseService implements HeartbeatServiceInterface 
     if (!this._conn) {
       this._conn = await this.connectToHeartbeatService();
     }
-    
+
     const request = this.createHeartbeatRequest();
     try {
       await this._conn.sendPlistRequest(request, 500);
@@ -85,14 +88,14 @@ class HeartbeatService extends BaseService implements HeartbeatServiceInterface 
     if (!this._conn) {
       this._conn = await this.connectToHeartbeatService();
     }
-    
+
     // Wait for any message from iOS (not specifically Marco)
     const message = await this._conn.receive(this.timeout);
     log.debug(`Received message from iOS: ${JSON.stringify(message)}`);
-    
+
     // Send Polo response to any message received
     await this.sendPolo();
-    
+
     return message as PlistDictionary;
   }
 
@@ -113,7 +116,7 @@ class HeartbeatService extends BaseService implements HeartbeatServiceInterface 
       try {
         const response = await this._conn.receive(this.timeout);
         log.debug(`Received heartbeat: ${JSON.stringify(response)}`);
-        
+
         yield response;
 
         if (interval && (Date.now() - startTime) / 1000 >= interval) {
@@ -121,7 +124,6 @@ class HeartbeatService extends BaseService implements HeartbeatServiceInterface 
         }
 
         await this.sendPolo();
-        
       } catch (error) {
         if (this._isHeartbeatRunning) {
           log.error(`Heartbeat monitoring error: ${(error as Error).message}`);
