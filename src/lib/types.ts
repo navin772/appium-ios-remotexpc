@@ -218,27 +218,11 @@ export interface NotificationProxyService extends BaseService {
 export interface HeartbeatService extends BaseService {
   /**
    * Start the heartbeat service and establish connection
-   * Follows Python implementation: recv_plist() -> send_plist({'Command': 'Polo'}) loop
+   * Continuously receives messages from iOS and responds with Polo commands
    * @param interval Optional interval in seconds to stop after
-   * @param blocking If true, blocks until service stops (Python behavior). If false, starts and returns immediately.
-   * @returns Promise that resolves when the service stops (if blocking) or when service starts (if non-blocking)
+   * @returns Promise that resolves when the service stops
    */
-  start(interval?: number, blocking?: boolean): Promise<void>;
-  /**
-   * Stop the heartbeat service
-   * @returns Promise that resolves when the service is stopped
-   */
-  stop(): Promise<void>;
-  /**
-   * Send a Polo response (matches Python: service.send_plist({'Command': 'Polo'}))
-   * @returns Promise that resolves when the Polo response is sent
-   */
-  sendPolo(): Promise<void>;
-  /**
-   * Check if the heartbeat service is running
-   * @returns Boolean indicating if the service is active
-   */
-  isRunning(): boolean;
+  start(interval?: number): Promise<void>;
   /**
    * Connect to the heartbeat service
    * @returns Promise resolving to the ServiceConnection instance
