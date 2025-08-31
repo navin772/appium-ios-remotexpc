@@ -218,36 +218,22 @@ export interface NotificationProxyService extends BaseService {
 export interface HeartbeatService extends BaseService {
   /**
    * Start the heartbeat service and establish connection
-   * @returns Promise that resolves when the connection is established
+   * Follows Python implementation: recv_plist() -> send_plist({'Command': 'Polo'}) loop
+   * @param interval Optional interval in seconds to stop after
+   * @param blocking If true, blocks until service stops (Python behavior). If false, starts and returns immediately.
+   * @returns Promise that resolves when the service stops (if blocking) or when service starts (if non-blocking)
    */
-  start(): Promise<void>;
+  start(interval?: number, blocking?: boolean): Promise<void>;
   /**
    * Stop the heartbeat service
    * @returns Promise that resolves when the service is stopped
    */
   stop(): Promise<void>;
   /**
-   * Send a heartbeat response (Polo command) after receiving Marco
+   * Send a Polo response (matches Python: service.send_plist({'Command': 'Polo'}))
    * @returns Promise that resolves when the Polo response is sent
    */
   sendPolo(): Promise<void>;
-  /**
-   * Wait for any message from iOS and send Polo response
-   * @returns Promise that resolves with the message received from iOS
-   */
-  waitForMessageAndSendPolo(): Promise<PlistDictionary>;
-  /**
-   * Start heartbeat monitoring with automatic interval
-   * @param interval Interval in seconds between heartbeats
-   * @returns AsyncGenerator yielding heartbeat responses
-   */
-  monitorHeartbeat(interval?: number): AsyncGenerator<PlistMessage>;
-  /**
-   * Wait for a single heartbeat response
-   * @param timeout Timeout in milliseconds
-   * @returns Promise resolving to the heartbeat response
-   */
-  waitForHeartbeat(timeout?: number): Promise<PlistMessage>;
   /**
    * Check if the heartbeat service is running
    * @returns Boolean indicating if the service is active

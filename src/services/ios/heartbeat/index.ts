@@ -3,22 +3,17 @@ import { logger } from '@appium/support';
 import type {
   HeartbeatService as HeartbeatServiceInterface,
   PlistDictionary,
-  PlistMessage,
 } from '../../../lib/types.js';
 import { ServiceConnection } from '../../../service-connection.js';
 import { BaseService } from '../base-service.js';
 
 const log = logger.getLogger('HeartbeatService');
 
-export interface HeartbeatRequest extends PlistDictionary {
-  Command: 'Polo';
-}
-
 /**
- * HeartbeatService provides an API to:
- * - Start heartbeat session for connection keep-alive
- * - Send heartbeat requests (Polo commands)
- * - Receive heartbeat responses for connection monitoring
+ * HeartbeatService - Use to keep an active connection with lockdownd
+ * 
+ * This service maintains a connection by responding to iOS heartbeat requests
+ * with Polo responses. It follows the Python pymobiledevice3 implementation.
  */
 class HeartbeatService
   extends BaseService
@@ -36,14 +31,51 @@ class HeartbeatService
 
   /**
    * Start the heartbeat service and establish connection
-   * @returns Promise that resolves when the connection is established
+   * Follows Python implementation: recv_plist() -> send_plist({'Command': 'Polo'}) loop
+   * @param interval Optional interval in seconds to stop after
+   * @param blocking If true, blocks until service stops (Python behavior). If false, starts and returns immediately.
+   * @returns Promise that resolves when the service stops (if blocking) or when service starts (if non-blocking)
    */
-  async start(): Promise<void> {
+  async start(interval?: number, blocking: boolean = false): Promise<void> {
     if (!this._conn) {
       this._conn = await this.connectToHeartbeatService();
     }
+    
     this._isHeartbeatRunning = true;
     log.info('Heartbeat service started');
+    
+    if (!blocking) {
+      // Non-blocking mode: start service and return immediately
+      // This allows tests to call other methods on the service
+      return;
+    }
+
+    // Blocking mode: matches Python implementation exactly
+    const startTime = Date.now();
+
+    // Python: while True: response = service.recv_plist() ... service.send_plist({'Command': 'Polo'})
+    while (this._isHeartbeatRunning) {
+      try {
+        // Python: response = service.recv_plist()
+        const response = await this._conn.receive(this.timeout);
+        log.debug(`Received heartbeat: ${JSON.stringify(response)}`);
+
+        // Python: if interval is not None: if time.time() >= start + interval: break
+        if (interval && (Date.now() - startTime) / 1000 >= interval) {
+          break;
+        }
+
+        // Python: service.send_plist({'Command': 'Polo'})
+        await this.sendPolo();
+        
+      } catch (error) {
+        if (this._isHeartbeatRunning) {
+          log.error(`Heartbeat monitoring error: ${(error as Error).message}`);
+          throw error;
+        }
+        break;
+      }
+    }
   }
 
   /**
@@ -60,7 +92,7 @@ class HeartbeatService
   }
 
   /**
-   * Send a heartbeat response (Polo command) after receiving Marco
+   * Send a Polo response (matches Python: service.send_plist({'Command': 'Polo'}))
    * @returns Promise that resolves when the Polo response is sent
    */
   async sendPolo(): Promise<void> {
@@ -68,7 +100,7 @@ class HeartbeatService
       this._conn = await this.connectToHeartbeatService();
     }
 
-    const request = this.createHeartbeatRequest();
+    const request = { Command: 'Polo' };
     try {
       await this._conn.sendPlistRequest(request, 500);
     } catch (error) {
@@ -78,80 +110,6 @@ class HeartbeatService
       }
     }
     log.debug('Sent Polo response');
-  }
-
-  /**
-   * Wait for any message from iOS and send Polo response
-   * @returns Promise that resolves with the message received from iOS
-   */
-  async waitForMessageAndSendPolo(): Promise<PlistDictionary> {
-    if (!this._conn) {
-      this._conn = await this.connectToHeartbeatService();
-    }
-
-    // Wait for any message from iOS (not specifically Marco)
-    const message = await this._conn.receive(this.timeout);
-    log.debug(`Received message from iOS: ${JSON.stringify(message)}`);
-
-    // Send Polo response to any message received
-    await this.sendPolo();
-
-    return message as PlistDictionary;
-  }
-
-  /**
-   * Start heartbeat monitoring with automatic interval
-   * @param interval Interval in seconds (if specified, stops after interval)
-   * @returns AsyncGenerator yielding heartbeat responses
-   */
-  async *monitorHeartbeat(interval?: number): AsyncGenerator<PlistMessage> {
-    if (!this._conn) {
-      this._conn = await this.connectToHeartbeatService();
-    }
-
-    this._isHeartbeatRunning = true;
-    const startTime = Date.now();
-
-    while (this._isHeartbeatRunning) {
-      try {
-        const response = await this._conn.receive(this.timeout);
-        log.debug(`Received heartbeat: ${JSON.stringify(response)}`);
-
-        yield response;
-
-        if (interval && (Date.now() - startTime) / 1000 >= interval) {
-          break;
-        }
-
-        await this.sendPolo();
-      } catch (error) {
-        if (this._isHeartbeatRunning) {
-          log.error(`Heartbeat monitoring error: ${(error as Error).message}`);
-          throw error;
-        }
-        break;
-      }
-    }
-  }
-
-  /**
-   * Wait for a single heartbeat response
-   * @param timeout Timeout in milliseconds
-   * @returns Promise resolving to the heartbeat response
-   */
-  async waitForHeartbeat(timeout: number = 10000): Promise<PlistMessage> {
-    if (!this._conn) {
-      this._conn = await this.connectToHeartbeatService();
-    }
-
-    try {
-      const response = await this._conn.receive(timeout);
-      log.debug(`Received heartbeat response: ${JSON.stringify(response)}`);
-      return response;
-    } catch (error) {
-      log.error(`Error waiting for heartbeat: ${(error as Error).message}`);
-      throw error;
-    }
   }
 
   /**
@@ -173,12 +131,6 @@ class HeartbeatService
     const service = this.getServiceConfig();
     this._conn = await this.startLockdownService(service);
     return this._conn;
-  }
-
-  private createHeartbeatRequest(): HeartbeatRequest {
-    return {
-      Command: 'Polo',
-    };
   }
 
   private getServiceConfig(): {
