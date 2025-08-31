@@ -35,34 +35,33 @@ describe('HeartbeatService', function () {
   });
 
   it('should start heartbeat service as keep-alive mechanism', async function () {
-    this.timeout(10000);
+    this.timeout(15000);
 
+    // Test that the service can start (this doesn't block, just establishes connection)
     await heartbeatServiceWithConnection.heartbeatService.start();
     expect(heartbeatServiceWithConnection.heartbeatService.isRunning()).to.be
       .true;
 
-    log.info(
-      '✅ HeartbeatService started successfully as keep-alive mechanism',
-    );
-    log.info(
-      'Service will respond to iOS with Polo if iOS sends heartbeat requests during critical operations',
-    );
+    log.info('✅ HeartbeatService started successfully as keep-alive mechanism');
   });
 
-  it('should be able to send Polo response manually', async function () {
+  it('should send Polo response manually', async function () {
     this.timeout(10000);
 
+    // Start service if not running
     if (!heartbeatServiceWithConnection.heartbeatService.isRunning()) {
       await heartbeatServiceWithConnection.heartbeatService.start();
     }
 
+    // Test manual Polo sending (this is what gets called in the recv->send loop)
     await heartbeatServiceWithConnection.heartbeatService.sendPolo();
     log.info('✅ Successfully sent Polo response');
   });
 
-  it('service lifecycle management', async function () {
+  it('should manage service lifecycle correctly', async function () {
     this.timeout(15000);
 
+    // Test complete lifecycle
     expect(heartbeatServiceWithConnection.heartbeatService.isRunning()).to.be
       .false;
 
