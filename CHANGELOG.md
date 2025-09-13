@@ -1,3 +1,9 @@
+## [0.4.1](https://github.com/appium/appium-ios-remotexpc/compare/v0.4.0...v0.4.1) (2025-09-13)
+
+### Bug Fixes
+
+* call identifiers command once in case of TSS ([#69](https://github.com/appium/appium-ios-remotexpc/issues/69)) ([f7ac423](https://github.com/appium/appium-ios-remotexpc/commit/f7ac4237353a116b96cc3f770268b12b20b2d5c4))
+
 ## [0.4.0](https://github.com/appium/appium-ios-remotexpc/compare/v0.3.3...v0.4.0) (2025-09-13)
 
 ### Features
