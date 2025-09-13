@@ -1,3 +1,9 @@
+## [0.4.0](https://github.com/appium/appium-ios-remotexpc/compare/v0.3.3...v0.4.0) (2025-09-13)
+
+### Features
+
+* implement `mobile_image_mounter` service ([#68](https://github.com/appium/appium-ios-remotexpc/issues/68)) ([c8253f0](https://github.com/appium/appium-ios-remotexpc/commit/c8253f0dccc16652d68755fa0fc73bdd1711c881))
+
 ## [0.3.3](https://github.com/appium/appium-ios-remotexpc/compare/v0.3.2...v0.3.3) (2025-09-05)
 
 ### Bug Fixes
