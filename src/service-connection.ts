@@ -51,6 +51,20 @@ export class ServiceConnection extends BasePlistService {
   }
 
   /**
+   * Sends a plist message without waiting for a response (fire-and-forget)
+   */
+  sendPlist(message: PlistDictionary): void {
+    this.send(message);
+  }
+
+  /**
+   * Receives a plist message with optional timeout
+   */
+  receivePlist(timeout?: number): Promise<PlistDictionary> {
+    return this.receive(timeout);
+  }
+
+  /**
    * Sends a plist request to the device and returns the response
    */
   sendPlistRequest(

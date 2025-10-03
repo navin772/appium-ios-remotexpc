@@ -414,6 +414,31 @@ export interface WebInspectorService extends BaseService {
     pageId: number,
     enable: boolean,
   ): Promise<void>;
+
+  /**
+   * Get all open pages from all applications
+   * @param timeout Time to wait for responses in milliseconds
+   * @returns Array of application-page pairs
+   */
+  getOpenApplicationPages(timeout?: number): Promise<Array<{ application: any; page: any }>>;
+
+  /**
+   * Get current connected applications from internal state
+   * @returns Map of application ID to application data
+   */
+  getConnectedApplicationsSync(): Map<string, any>;
+
+  /**
+   * Get application pages from internal state
+   * @returns Map of application ID to pages map
+   */
+  getApplicationPagesSync(): Map<string, Map<number, any>>;
+
+  /**
+   * Get automation availability
+   * @returns Automation availability string
+   */
+  getAutomationAvailability(): string;
 }
 
 /**

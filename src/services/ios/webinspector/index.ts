@@ -7,6 +7,7 @@ import type {
 } from '../../../lib/types.js';
 import { ServiceConnection } from '../../../service-connection.js';
 import { BaseService } from '../base-service.js';
+import { PlistService } from '../../../lib/plist/plist-service.js';
 
 const log = logger.getLogger('WebInspectorService');
 
@@ -23,7 +24,7 @@ export interface WebInspectorMessage extends PlistDictionary {
  * - Send messages to webinspectord
  * - Listen to messages from webinspectord
  * - Communicate with web views and Safari on iOS devices
- * 
+ *
  * This service is used for web automation, inspection, and debugging.
  */
 export class WebInspectorService extends BaseService {
@@ -33,6 +34,12 @@ export class WebInspectorService extends BaseService {
   private messageEmitter: EventEmitter = new EventEmitter();
   private isListening: boolean = false;
   private connectionId: string;
+  private isFirstMessage: boolean = true;
+
+  // Internal state tracking (like pmd3)
+  private connectedApplications: Map<string, any> = new Map();
+  private applicationPages: Map<string, Map<number, any>> = new Map();
+  private automationAvailability: string = 'WIRAutomationAvailabilityUnknown';
 
   constructor(address: [string, number]) {
     super(address);
@@ -64,10 +71,15 @@ export class WebInspectorService extends BaseService {
       return this.connection;
     }
 
-    const service = this.getServiceConfig();
-    this.connection = await this.startLockdownService(service);
+    // Enable verbose plist error logging to diagnose any decoder issues
+    PlistService.enableVerboseErrorLogging();
 
-    // Send initial identifier report
+    const service = this.getServiceConfig();
+    this.connection = await this.startLockdownService(service, {
+      plistOptions: { useBinaryEncoding: true },
+    });
+
+    // Send initial identifier report and handle StartService response if needed
     await this.reportIdentifier();
 
     log.debug('Connected to WebInspector service');
@@ -90,7 +102,380 @@ export class WebInspectorService extends BaseService {
    * This is the initial handshake message
    */
   private async reportIdentifier(): Promise<void> {
-    await this.sendMessage('_rpc_reportIdentifier:', {});
+    const isNewConnection = this.isFirstMessage;
+
+    if (!isNewConnection || !this.connection) {
+      return;
+    }
+
+    // Build the identifier message
+    const message: WebInspectorMessage = {
+      __selector: '_rpc_reportIdentifier:',
+      __argument: {
+        WIRConnectionIdentifierKey: this.connectionId,
+      },
+    };
+
+    log.debug('Sending _rpc_reportIdentifier: message');
+    log.debug(`Full message to send: ${JSON.stringify(message, null, 2)}`);
+
+    try {
+      // Send the identifier message
+      this.connection.sendPlist(message);
+      log.debug('_rpc_reportIdentifier: sent successfully');
+
+      // Like pmd3, wait for and handle the FIRST WebInspector message before starting background task.
+      // Drain any 'StartService' frames and ignore non-inspector frames until we get a __selector or time out.
+      try {
+        const timeoutMs = 5000;
+        const startTs = Date.now();
+        let handledFirst = false;
+
+        while (Date.now() - startTs < timeoutMs) {
+          const remaining = Math.max(1, timeoutMs - (Date.now() - startTs));
+          const response = await this.connection.receivePlist(remaining);
+          log.debug(`Initial WebInspector receive: ${JSON.stringify(response, null, 2)}`);
+
+          // Skip any StartService frames that may arrive late from RSD check-in
+          if (response && typeof response === 'object' && (response as any).Request === 'StartService') {
+            log.debug('Drained StartService during handshake, continuing to wait for __selector message...');
+            continue;
+          }
+
+          // Handle first valid inspector message
+          if (response && typeof response === 'object' && (response as any).__selector) {
+            log.debug(`Handling initial inspector message with selector: ${(response as any).__selector}`);
+            this.handleIncomingMessage(response);
+            handledFirst = true;
+            break;
+          }
+
+          // If it's neither StartService nor an inspector message, just log and continue
+          log.debug('Ignoring non-inspector preface frame during handshake (no __selector, not StartService)');
+        }
+
+        if (!handledFirst) {
+          log.warn('Did not receive initial WebInspector __selector message within handshake timeout');
+        }
+      } catch (receiveError) {
+        // Like pmd3, timeout here likely means WebInspector is not enabled
+        log.error(`No response from WebInspector service: ${(receiveError as Error).message}`);
+        log.error('This usually means WebInspector is not enabled on the device.');
+        log.error('To enable: Settings → Safari → Advanced → Web Inspector (turn ON)');
+        // Don't throw - allow service to continue but it won't receive messages
+      }
+
+      this.isFirstMessage = false;
+      log.debug('WebInspector service initialized');
+
+      // Now start background message receiver (like pmd3's create_task)
+      this.startBackgroundReceiver();
+    } catch (error) {
+      log.error('Failed to send _rpc_reportIdentifier:', (error as Error).message);
+      throw new Error(`WebInspector connection failed: ${(error as Error).message}`);
+    }
+  }
+
+  /**
+   * Handle incoming WebInspector messages (like pmd3's _handle_recv)
+   */
+  private handleIncomingMessage(plist: any): void {
+    if (!plist || typeof plist !== 'object') {
+      return;
+    }
+
+    const selector = plist.__selector;
+    const argument = plist.__argument || {};
+
+    log.debug(`Handling selector: ${selector}`);
+
+    switch (selector) {
+      case '_rpc_reportCurrentState:':
+        this.handleReportCurrentState(argument);
+        break;
+      case '_rpc_reportConnectedApplicationList:':
+        this.handleReportConnectedApplicationList(argument);
+        break;
+      case '_rpc_reportConnectedDriverList:':
+        // Present in pymobiledevice3; we don't use it currently, but log for visibility
+        log.debug('Received _rpc_reportConnectedDriverList: (ignored)');
+        break;
+      case '_rpc_applicationUpdated:':
+        this.handleApplicationUpdated(argument);
+        break;
+      case '_rpc_applicationSentListing:':
+        this.handleApplicationSentListing(argument);
+        break;
+      case '_rpc_applicationConnected:':
+        this.handleApplicationConnected(argument);
+        break;
+      case '_rpc_applicationDisconnected:':
+        this.handleApplicationDisconnected(argument);
+        break;
+      case '_rpc_applicationSentData:':
+        this.handleApplicationSentData(argument);
+        break;
+      default:
+        log.debug(`Unhandled selector: ${selector}`);
+    }
+
+    // Emit message for external listeners
+    this.messageEmitter.emit('message', plist);
+  }
+
+  /**
+   * Handle current state report
+   */
+  private handleReportCurrentState(arg: any): void {
+    this.automationAvailability = arg.WIRAutomationAvailabilityKey || 'WIRAutomationAvailabilityUnknown';
+    log.debug(`Automation availability: ${this.automationAvailability}`);
+  }
+
+  /**
+   * Handle connected application list (automatically sends _rpc_forwardGetListing: for each app)
+   */
+  private handleReportConnectedApplicationList(arg: any): void {
+    this.connectedApplications.clear();
+    const apps = arg.WIRApplicationDictionaryKey || {};
+
+    log.debug(`Received ${Object.keys(apps).length} connected applications`);
+
+    for (const [key, appData] of Object.entries(apps)) {
+      const app = appData as any;
+      this.connectedApplications.set(key, {
+        id: key,
+        bundle: app.WIRApplicationBundleIdentifierKey || app.WIRApplicationIdentifierKey,
+        pid: app.WIRApplicationBundleIdentifierKey ? undefined : parseInt(key.replace('PID:', ''), 10),
+        name: app.WIRApplicationNameKey,
+        availability: app.WIRAutomationAvailabilityKey || 'WIRAutomationAvailabilityUnknown',
+        active: app.WIRIsApplicationActiveKey || 0,
+        proxy: app.WIRIsApplicationProxyKey || false,
+        ready: app.WIRIsApplicationReadyKey || false,
+        host: app.WIRHostApplicationIdentifierKey || '',
+      });
+
+      // Automatically send _rpc_forwardGetListing: for this app (like pmd3)
+      log.debug(`Auto-requesting listing for app: ${key}`);
+      this.forwardGetListing(key).catch((err) => {
+        log.warn(`Failed to get listing for ${key}: ${(err as Error).message}`);
+      });
+    }
+  }
+
+  /**
+   * Handle application sent listing
+   */
+  private handleApplicationSentListing(arg: any): void {
+    const appId = arg.WIRApplicationIdentifierKey;
+    const listing = arg.WIRListingKey || {};
+
+    log.debug(`Received listing for app ${appId}: ${Object.keys(listing).length} pages`);
+
+    if (!this.applicationPages.has(appId)) {
+      this.applicationPages.set(appId, new Map());
+    }
+
+    const pages = this.applicationPages.get(appId)!;
+    for (const [pageId, pageData] of Object.entries(listing)) {
+      const page = pageData as any;
+      pages.set(parseInt(pageId, 10), {
+        id: parseInt(pageId, 10),
+        type: page.WIRTypeKey,
+        webURL: page.WIRURLKey,
+        webTitle: page.WIRTitleKey,
+        automationIsPairedKey: page.WIRAutomationTargetIsPairedKey || false,
+        automationName: page.WIRAutomationTargetNameKey,
+        automationVersion: page.WIRAutomationTargetVersionKey,
+        automationSessionId: page.WIRSessionIdentifierKey,
+        automationConnectionId: page.WIRConnectionIdentifierKey,
+      });
+    }
+  }
+
+  /**
+   * Handle application updated (merge fields into existing entry)
+   */
+  private handleApplicationUpdated(arg: any): void {
+    const appId: string = arg.WIRApplicationIdentifierKey;
+    const existing = this.connectedApplications.get(appId) || {};
+    const updated = {
+      id: appId,
+      bundle: arg.WIRApplicationBundleIdentifierKey ?? existing.bundle,
+      pid: existing.pid ?? (appId?.startsWith('PID:') ? parseInt(appId.replace('PID:', ''), 10) : undefined),
+      name: arg.WIRApplicationNameKey ?? existing.name,
+      availability: arg.WIRAutomationAvailabilityKey ?? existing.availability ?? 'WIRAutomationAvailabilityUnknown',
+      active: arg.WIRIsApplicationActiveKey ?? existing.active ?? 0,
+      proxy: arg.WIRIsApplicationProxyKey ?? existing.proxy ?? false,
+      ready: arg.WIRIsApplicationReadyKey ?? existing.ready ?? false,
+      host: arg.WIRHostApplicationIdentifierKey ?? existing.host ?? '',
+    };
+    this.connectedApplications.set(appId, updated);
+    log.debug(`Application updated: ${appId} (${updated.name || 'unknown'})`);
+  }
+
+  /**
+   * Handle application connected
+   */
+  private handleApplicationConnected(arg: any): void {
+    const appId = arg.WIRApplicationIdentifierKey;
+    log.debug(`Application connected: ${appId}`);
+    // Application data will come in _rpc_reportConnectedApplicationList:
+  }
+
+  /**
+   * Handle application disconnected
+   */
+  private handleApplicationDisconnected(arg: any): void {
+    const appId = arg.WIRApplicationIdentifierKey;
+    log.debug(`Application disconnected: ${appId}`);
+    this.connectedApplications.delete(appId);
+    this.applicationPages.delete(appId);
+  }
+
+  /**
+   * Handle application sent data
+   */
+  private handleApplicationSentData(arg: any): void {
+    log.debug('Application sent data:', JSON.stringify(arg).substring(0, 200));
+    // This is typically inspector protocol data
+  }
+
+  /**
+   * Start background receiver that processes messages continuously (like pmd3's _receiving_task)
+   */
+  private async startBackgroundReceiver(): Promise<void> {
+    if (!this.connection) {
+      return;
+    }
+
+    // Prevent multiple receivers
+    if (this.isListening) {
+      log.debug('Background receiver already running');
+      return;
+    }
+
+    this.isListening = true;
+    log.debug('Starting background message receiver');
+
+    // Run in background, don't await
+    const receiverPromise = (async () => {
+      let loopCount = 0;
+      let consecutiveTimeouts = 0;
+      log.debug('Background receiver async function started');
+      while (this.connection && this.isListening) {
+        loopCount++;
+        log.debug(`Background receiver loop iteration ${loopCount}, isListening=${this.isListening}, hasConnection=${!!this.connection}`);
+        try {
+          log.debug(`Calling receivePlist with 10s timeout...`);
+
+          // Retry loop like pmd3 to handle incomplete reads
+          let message: any = null;
+          let retryCount = 0;
+          while (retryCount < 3) {
+            try {
+              message = await this.connection.receivePlist(10000);
+              log.debug(`receivePlist returned successfully`);
+              break;
+            } catch (recvError) {
+              const errorMsg = (recvError as Error).message || '';
+              if (errorMsg.includes('Unicode') || errorMsg.includes('replacement') || errorMsg.includes('encoding')) {
+                // Incomplete/corrupted plist data - retry like pmd3
+                retryCount++;
+                log.debug(`Incomplete plist data (attempt ${retryCount}/3), retrying...`);
+                await new Promise(resolve => setTimeout(resolve, 100)); // Brief delay
+                continue;
+              }
+              // Not an incomplete read error, rethrow
+              throw recvError;
+            }
+          }
+
+          if (!message) {
+            log.warn('Failed to receive valid plist after 3 attempts');
+            continue;
+          }
+
+          // Reset timeout counter on successful receive
+          consecutiveTimeouts = 0;
+
+          log.debug(`Background receiver got message (loop ${loopCount}): ${JSON.stringify(message).substring(0, 500)}`);
+
+          if (message && typeof message === 'object') {
+            // Skip StartService responses that might arrive late
+            if ((message as any).Request === 'StartService') {
+              log.debug('Skipping StartService response in background receiver');
+              continue;
+            }
+
+            // Handle the message (updates internal state, sends auto-requests)
+            this.handleIncomingMessage(message);
+          }
+        } catch (error) {
+          log.debug(`receivePlist threw error: ${(error as Error).message}`);
+          // Timeouts are normal, just continue
+          const errorMsg = (error as Error).message || '';
+          if (errorMsg.includes('timeout') || errorMsg.includes('timed out') || errorMsg.includes('Timed out')) {
+            // This is normal - just means no messages arrived
+            consecutiveTimeouts++;
+            log.debug(`Background receiver timeout (loop ${loopCount}, ${consecutiveTimeouts} consecutive), continuing...`);
+
+            // After several consecutive timeouts, warn that WebInspector might not be enabled
+            if (consecutiveTimeouts === 3) {
+              log.warn('WebInspector not receiving any messages after 3 timeouts.');
+              log.warn('This likely means WebInspector is not enabled on device.');
+              log.warn('To enable: Settings → Safari → Advanced → Web Inspector');
+            }
+            continue;
+          }
+          // Other errors might indicate connection issues
+          log.warn(`Background receiver error: ${errorMsg}`);
+
+          // If connection is closed, exit loop
+          if (!this.connection || !this.isListening) {
+            log.debug('Connection closed or not listening, breaking loop');
+            break;
+          }
+        }
+        log.debug(`End of loop iteration ${loopCount}, continuing to next iteration`);
+      }
+      log.debug(`Background receiver stopped after ${loopCount} iterations, isListening=${this.isListening}`);
+    })();
+
+    receiverPromise.catch((err) => {
+      log.error(`Background receiver fatal error: ${(err as Error).message}`);
+      log.error(err.stack);
+    });
+  }
+
+  /**
+   * Send a message directly without waiting for response (fire-and-forget)
+   */
+  private sendWebInspectorMessageDirectly(
+    selector: string,
+    args: PlistDictionary = {},
+  ): void {
+    if (!this.connection) {
+      throw new Error('Connection not established');
+    }
+
+    // Add connection identifier to all messages
+    const messageArgs: PlistDictionary = {
+      ...args,
+      WIRConnectionIdentifierKey: this.connectionId,
+    };
+
+    const message: WebInspectorMessage = {
+      __selector: selector,
+      __argument: messageArgs,
+    };
+
+    const messageStr = JSON.stringify(message);
+    log.debug(`Sending WebInspector message: ${selector}`);
+    log.debug(`Message content: ${messageStr.substring(0, 300)}`);
+
+    // Fire-and-forget send (no response expected)
+    this.connection.sendPlist(message);
+    log.debug(`sendPlist() completed for ${selector}`);
   }
 
   /**
@@ -107,23 +492,7 @@ export class WebInspectorService extends BaseService {
       await this.connectToWebInspectorService();
     }
 
-    // Add connection identifier to all messages
-    const messageArgs: PlistDictionary = {
-      ...args,
-      WIRConnectionIdentifierKey: this.connectionId,
-    };
-
-    const message: WebInspectorMessage = {
-      __selector: selector,
-      __argument: messageArgs,
-    };
-
-    log.debug(`Sending WebInspector message: ${selector}`);
-    log.debug(`Message details: ${JSON.stringify(message, null, 2)}`);
-
-    // WebInspector uses a fire-and-forget pattern for sending messages
-    // We need to use a helper method to send without waiting for response
-    await this.sendWebInspectorMessage(message);
+    this.sendWebInspectorMessageDirectly(selector, args);
   }
 
   /**
@@ -138,16 +507,16 @@ export class WebInspectorService extends BaseService {
       await this.connectToWebInspectorService();
     }
 
-    if (this.isListening) {
-      log.warn('Already listening for messages');
-      return;
-    }
-
-    this.isListening = true;
+    // Add callback to listeners
     this.messageEmitter.on('message', callback);
 
-    // Start receiving messages in the background
-    this.startMessageReceiver();
+    // Background receiver is already running (started in reportIdentifier)
+    // Just need to make sure it's started
+    if (!this.isListening) {
+      await this.startBackgroundReceiver();
+    }
+    const count = this.messageEmitter.listenerCount('message');
+    log.debug(`Added message listener. Total listeners: ${count} (background receiver handles messages)`);
   }
 
   /**
@@ -158,10 +527,14 @@ export class WebInspectorService extends BaseService {
       return;
     }
 
+    log.debug('Starting WebInspector message receiver');
+
     try {
       while (this.isListening) {
         try {
-          const message = await this.connection.receive();
+          // Use a moderate timeout for continuous listening (5 seconds)
+          // WebInspector messages are event-driven, not constant
+          const message = await this.connection.receive(5000);
 
           const messageStr = JSON.stringify(message);
           const truncatedStr =
@@ -170,13 +543,24 @@ export class WebInspectorService extends BaseService {
               : messageStr;
           log.debug(`Received WebInspector message: ${truncatedStr}`);
 
+          // Skip the StartService response if we somehow get it here
+          if (message && typeof message === 'object' &&
+            (message as any).Request === 'StartService') {
+            log.debug('Skipping StartService response in message receiver');
+            continue;
+          }
+
           // Emit the message to all listeners
           this.messageEmitter.emit('message', message);
         } catch (error) {
           if (this.isListening) {
-            log.error(
-              `Error receiving WebInspector message: ${(error as Error).message}`,
-            );
+            // If we timeout, just continue the loop - no messages available yet
+            const errorMsg = (error as Error).message;
+            if (errorMsg.includes('Timed out')) {
+              // Timeout is normal when no messages are being sent
+              continue;
+            }
+            log.error(`Error receiving WebInspector message: ${errorMsg}`);
           }
           break;
         }
@@ -186,43 +570,29 @@ export class WebInspectorService extends BaseService {
         `Message receiver error: ${(error as Error).message}`,
       );
     }
+
+    log.debug('Stopped WebInspector message receiver');
   }
 
   /**
    * Stop listening to messages
+   * Note: This only removes external callbacks, the background receiver continues
+   * to run for automatic message handling
    */
   stopListening(): void {
-    this.isListening = false;
     this.messageEmitter.removeAllListeners('message');
     log.debug('Stopped listening for WebInspector messages');
   }
 
-  /**
-   * Send a WebInspector message without waiting for response
-   * @param message The message to send
-   */
-  private async sendWebInspectorMessage(
-    message: WebInspectorMessage,
-  ): Promise<void> {
-    if (!this.connection) {
-      throw new Error('Connection not established');
-    }
-    
-    // Access the underlying PlistService through the protected method
-    const plistService = (this.connection as any).getPlistService();
-    if (!plistService) {
-      throw new Error('PlistService not available');
-    }
-    
-    // Send the message using the PlistService's sendPlist method
-    plistService.sendPlist(message);
-  }
+
 
   /**
    * Close the connection and clean up resources
    */
   async close(): Promise<void> {
-    this.stopListening();
+    // Stop the background receiver
+    this.isListening = false;
+    this.messageEmitter.removeAllListeners('message');
 
     if (this.connection) {
       await this.connection.close();
@@ -359,6 +729,55 @@ export class WebInspectorService extends BaseService {
       WIRPageIdentifierKey: pageId,
       WIRIndicateEnabledKey: enable,
     });
+  }
+
+  /**
+   * Get all open pages from all applications (like pmd3's get_open_application_pages)
+   * This triggers the query and waits for responses
+   * @param timeout Time to wait for responses in milliseconds (default 3000)
+   */
+  async getOpenApplicationPages(timeout: number = 3000): Promise<Array<{ application: any; page: any }>> {
+    // Trigger the query
+    await this.getConnectedApplications();
+
+    // Wait for responses to arrive (messages are handled in background)
+    await new Promise(resolve => setTimeout(resolve, timeout));
+
+    // Collect results from internal state
+    const result: Array<{ application: any; page: any }> = [];
+
+    for (const [appId, app] of this.connectedApplications) {
+      const pages = this.applicationPages.get(appId);
+      if (pages) {
+        for (const [pageId, page] of pages) {
+          result.push({ application: app, page });
+        }
+      }
+    }
+
+    log.debug(`Found ${result.length} open pages across ${this.connectedApplications.size} applications`);
+    return result;
+  }
+
+  /**
+   * Get current connected applications (from internal state)
+   */
+  getConnectedApplicationsSync(): Map<string, any> {
+    return new Map(this.connectedApplications);
+  }
+
+  /**
+   * Get application pages (from internal state)
+   */
+  getApplicationPagesSync(): Map<string, Map<number, any>> {
+    return new Map(this.applicationPages);
+  }
+
+  /**
+   * Get automation availability
+   */
+  getAutomationAvailability(): string {
+    return this.automationAvailability;
   }
 }
 
