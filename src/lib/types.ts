@@ -268,17 +268,10 @@ export interface MobileConfigService extends BaseService {
  */
 export interface HeartbeatService extends BaseService {
   /**
-   * Start the heartbeat service and establish connection
-   * Continuously receives messages from iOS and responds with Polo commands
+   * Start the heartbeat service
    * @param interval Optional interval in seconds to stop after
-   * @returns Promise that resolves when the service stops
    */
   start(interval?: number): Promise<void>;
-  /**
-   * Connect to the heartbeat service
-   * @returns Promise resolving to the ServiceConnection instance
-   */
-  connectToHeartbeatService(): Promise<ServiceConnection>;
 }
 
 /**
