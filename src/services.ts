@@ -223,13 +223,40 @@ export async function createRemoteXPCConnection(udid: string) {
 
 // #region Private Functions
 
+/**
+ * Get tunnel information from either:
+ * 1. Environment variables (RSD_ADDRESS, RSD_PORT) - for WiFi tunnels
+ * 2. Tunnel registry API - for USB tunnels
+ * 
+ * To use WiFi tunnel, set environment variables before running:
+ *   RSD_ADDRESS=fd14:974d:66b2::1 RSD_PORT=49174 npm test
+ */
 async function getTunnelInformation(udid: string) {
+  // Check for direct RSD connection via environment variables (WiFi tunnel)
+  const rsdAddress = process.env.RSD_ADDRESS;
+  const rsdPort = process.env.RSD_PORT;
+  
+  if (rsdAddress && rsdPort) {
+    const port = parseInt(rsdPort, 10);
+    if (isNaN(port)) {
+      throw new Error(`Invalid RSD_PORT: ${rsdPort}`);
+    }
+    return {
+      host: rsdAddress,
+      port,
+      rsdPort: port,
+    };
+  }
+
+  // Fall back to tunnel registry (USB tunnel)
   const box = strongbox(APPIUM_XCUITEST_DRIVER_NAME);
   const item = await box.createItem(TUNNEL_REGISTRY_PORT);
   const tunnelRegistryPort = await item.read();
   if (tunnelRegistryPort === undefined) {
     throw new Error(
-      'Tunnel registry port not found. Please run the tunnel creation script first: sudo appium driver run xcuitest tunnel-creation',
+      'Tunnel not found. Either:\n' +
+      '  1. Set RSD_ADDRESS and RSD_PORT env vars for WiFi tunnel, or\n' +
+      '  2. Run USB tunnel: sudo appium driver run xcuitest tunnel-creation',
     );
   }
   const tunnelApiClient = new TunnelApiClient(
@@ -238,7 +265,9 @@ async function getTunnelInformation(udid: string) {
   const tunnelExists = await tunnelApiClient.hasTunnel(udid);
   if (!tunnelExists) {
     throw new Error(
-      `No tunnel found for device ${udid}. Please run the tunnel creation script first: sudo appium driver run xcuitest tunnel-creation`,
+      `No tunnel found for device ${udid}. Either:\n` +
+      '  1. Set RSD_ADDRESS and RSD_PORT env vars for WiFi tunnel, or\n' +
+      '  2. Run USB tunnel: sudo appium driver run xcuitest tunnel-creation',
     );
   }
   const tunnelConnection = await tunnelApiClient.getTunnelConnection(udid);

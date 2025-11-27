@@ -103,6 +103,33 @@ sudo npx tsx scripts/test-wifi-rsd-services.ts <rsd-address> <rsd-port>
 
 ---
 
+## Running Tests over WiFi
+
+With the WiFi tunnel running, you can run existing integration tests by setting environment variables:
+
+```bash
+# Terminal 1: Start the WiFi tunnel
+sudo npx tsx scripts/test-wifi-tunnel.ts
+# Note the RSD Address and Port from the output
+```
+
+```bash
+# Terminal 2: Run tests with RSD_ADDRESS and RSD_PORT
+cd appium-ios-remotexpc
+sudo RSD_ADDRESS=fd14:974d:66b2::1 RSD_PORT=49174 npm test
+```
+
+Or run a specific test:
+
+```bash
+sudo RSD_ADDRESS=fd14:974d:66b2::1 RSD_PORT=49174 \
+  npx mocha test/integration/dvt_instruments/condition-inducer-test.ts
+```
+
+**Note**: Replace the address and port with the values shown by your WiFi tunnel.
+
+---
+
 ## Troubleshooting
 
 ### "No WiFi devices found"
