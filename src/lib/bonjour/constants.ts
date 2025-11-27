@@ -11,7 +11,10 @@ export const BONJOUR_TIMEOUTS = {
 
 // Service types
 export const BONJOUR_SERVICE_TYPES = {
+  /** Apple TV manual pairing service (requires PIN entry) */
   APPLE_TV_PAIRING: '_remotepairing-manual-pairing._tcp',
+  /** iOS remote pairing service (WiFi tunnel, no PIN required after USB pairing) */
+  REMOTE_PAIRING: '_remotepairing._tcp',
 } as const;
 
 export const BONJOUR_DEFAULT_DOMAIN = 'local';
