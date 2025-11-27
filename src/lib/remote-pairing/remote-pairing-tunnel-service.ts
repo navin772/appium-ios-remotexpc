@@ -58,6 +58,18 @@ export interface RemotePairingTunnelResult {
   hostname: string;
   /** Device port */
   port: number;
+  /** Shared encryption key for tunnel (can be used as PSK) */
+  encryptionKey: Buffer;
+}
+
+/**
+ * Result of createListener request
+ */
+export interface ListenerResult {
+  /** Port to connect to for tunnel */
+  port: number;
+  /** Additional parameters */
+  [key: string]: any;
 }
 
 /**
@@ -132,12 +144,111 @@ export class RemotePairingTunnelService {
         remoteIdentifier: this.remoteIdentifier,
         hostname: this.targetHostname,
         port: this.targetPort,
+        encryptionKey: this.encryptionKey!,
       };
     } catch (error) {
       await this.close();
       throw error;
     }
   }
+
+  /**
+   * Creates a TCP listener on the device for tunnel connection
+   * This must be called after connect() succeeds
+   * @returns Listener parameters including the port to connect to
+   */
+  async createTcpListener(): Promise<ListenerResult> {
+    if (!this.encryptionKey || !this.clientCipher || !this.serverCipher) {
+      throw new Error('Not connected. Call connect() first.');
+    }
+
+    log.info('Creating TCP listener on device...');
+
+    const request = {
+      request: {
+        _0: {
+          createListener: {
+            key: this.encryptionKey.toString('base64'),
+            peerConnectionsInfo: [
+              { owningPID: process.pid, owningProcessName: 'appium-remotexpc' },
+            ],
+            transportProtocolType: 'tcp',
+          },
+        },
+      },
+    };
+
+    const response = await this.sendReceiveEncryptedRequest(request);
+    const listenerResult = response.createListener;
+
+    log.info(`TCP listener created on port: ${listenerResult.port}`);
+
+    return listenerResult;
+  }
+
+  /**
+   * Sends an encrypted request and receives response
+   */
+  private async sendReceiveEncryptedRequest(request: any): Promise<any> {
+    if (!this.clientCipher || !this.serverCipher) {
+      throw new Error('Encryption not initialized');
+    }
+
+    const nonce = this.createSequenceNonce(this._encryptedSequenceNumber);
+    const plaintext = Buffer.from(JSON.stringify(request), 'utf8');
+
+    const encryptedData = encryptChaCha20Poly1305({
+      plaintext,
+      key: this.clientCipher.key,
+      nonce,
+      aad: Buffer.alloc(0),
+    });
+
+    await this.sendRequest({
+      message: { streamEncrypted: { _0: encryptedData.toString('base64') } },
+      originatedBy: 'host',
+      sequenceNumber: this._sequenceNumber++,
+    });
+
+    const response = await this.receiveResponse();
+    this._encryptedSequenceNumber++;
+
+    // Decrypt the response
+    const encryptedResponseData = Buffer.from(
+      response.message.streamEncrypted._0,
+      'base64',
+    );
+
+    const decrypted = decryptChaCha20Poly1305({
+      ciphertext: encryptedResponseData,
+      key: this.serverCipher.key,
+      nonce,
+    });
+
+    const decryptedResponse = JSON.parse(decrypted.toString('utf8'));
+    const result = decryptedResponse.response?._1;
+
+    if (result?.errorExtended) {
+      throw new Error(
+        result.errorExtended._0?.userInfo?.NSLocalizedDescription ||
+          'Unknown error',
+      );
+    }
+
+    return result;
+  }
+
+  /**
+   * Creates a sequence-based nonce for encrypted communication
+   */
+  private createSequenceNonce(sequenceNumber: number): Buffer {
+    const nonce = Buffer.alloc(12);
+    // Write sequence number as little-endian 64-bit integer
+    nonce.writeBigUInt64LE(BigInt(sequenceNumber), 0);
+    return nonce;
+  }
+
+  private _encryptedSequenceNumber = 0;
 
   /**
    * Closes the connection

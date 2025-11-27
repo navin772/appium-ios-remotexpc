@@ -18,7 +18,9 @@
  *   --import-keys <udid>  Import pairing keys from pymobiledevice3 format
  *   --discover-only       Only discover devices, don't attempt connection
  */
+import { execSync, spawn } from 'node:child_process';
 import { readFileSync, existsSync } from 'node:fs';
+import * as net from 'node:net';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
@@ -32,6 +34,153 @@ import {
 import { parsePlist } from '../src/lib/plist/index.js';
 
 const log = logger.getLogger('WiFiTunnelTest');
+
+/**
+ * Connect using TLS-PSK via OpenSSL subprocess
+ * Returns a duplex stream that wraps the OpenSSL process
+ */
+async function connectWithTlsPsk(
+  host: string,
+  port: number,
+  pskHex: string,
+): Promise<net.Socket> {
+  return new Promise((resolve, reject) => {
+    // Use OpenSSL s_client for TLS-PSK
+    const openssl = spawn('openssl', [
+      's_client',
+      '-connect',
+      `${host}:${port}`,
+      '-psk',
+      pskHex,
+      '-psk_identity',
+      '',
+      '-tls1_2',
+      '-quiet',
+    ]);
+
+    const timeout = setTimeout(() => {
+      openssl.kill();
+      reject(new Error('TLS-PSK connection timeout'));
+    }, 10000);
+
+    let connected = false;
+
+    openssl.stderr?.on('data', (data: Buffer) => {
+      const text = data.toString();
+      log.debug(`OpenSSL stderr: ${text}`);
+      if (text.includes('errno=')) {
+        clearTimeout(timeout);
+        reject(new Error(`OpenSSL connection failed: ${text}`));
+      }
+    });
+
+    openssl.on('error', (err) => {
+      clearTimeout(timeout);
+      reject(err);
+    });
+
+    openssl.on('close', (code) => {
+      if (!connected) {
+        clearTimeout(timeout);
+        reject(new Error(`OpenSSL exited with code ${code}`));
+      }
+    });
+
+    // Give OpenSSL a moment to establish connection
+    setTimeout(() => {
+      if (!openssl.killed && openssl.stdin?.writable) {
+        connected = true;
+        clearTimeout(timeout);
+
+        // Create a fake socket-like wrapper around the OpenSSL process
+        const wrapper = new net.Socket();
+        (wrapper as any)._opensslProcess = openssl;
+        (wrapper as any).write = (data: Buffer) => {
+          openssl.stdin?.write(data);
+          return true;
+        };
+        (wrapper as any).destroy = () => {
+          openssl.kill();
+        };
+        (wrapper as any).destroyed = false;
+
+        // Forward stdout to socket data events
+        openssl.stdout?.on('data', (data: Buffer) => {
+          wrapper.emit('data', data);
+        });
+
+        openssl.on('close', () => {
+          (wrapper as any).destroyed = true;
+          wrapper.emit('close');
+        });
+
+        resolve(wrapper);
+      }
+    }, 1000);
+  });
+}
+
+/**
+ * Exchange CDTunnel parameters with the device
+ */
+async function exchangeCDTunnelParams(socket: net.Socket): Promise<any> {
+  return new Promise((resolve, reject) => {
+    const request = {
+      type: 'clientHandshakeRequest',
+      mtu: 16000,
+    };
+
+    const requestJSON = JSON.stringify(request);
+    const jsonBuffer = Buffer.from(requestJSON);
+    const magic = Buffer.from('CDTunnel');
+    const length = Buffer.alloc(2);
+    length.writeUInt16BE(jsonBuffer.length);
+    const message = Buffer.concat([magic, length, jsonBuffer]);
+
+    log.debug(`Sending CDTunnel request: ${requestJSON}`);
+    (socket as any).write(message);
+
+    let buffer = Buffer.alloc(0);
+    const timeout = setTimeout(() => {
+      reject(new Error('CDTunnel exchange timeout'));
+    }, 10000);
+
+    const handleData = (data: Buffer) => {
+      buffer = Buffer.concat([buffer, data]);
+      log.debug(`Received ${data.length} bytes, total buffer: ${buffer.length}`);
+
+      if (buffer.length < 10) {
+        return;
+      }
+
+      const receivedMagic = buffer.slice(0, 8).toString();
+      if (receivedMagic !== 'CDTunnel') {
+        clearTimeout(timeout);
+        socket.removeListener('data', handleData);
+        reject(new Error(`Invalid magic: ${receivedMagic}`));
+        return;
+      }
+
+      const payloadLength = buffer.readUInt16BE(8);
+      const totalLength = 8 + 2 + payloadLength;
+
+      if (buffer.length >= totalLength) {
+        clearTimeout(timeout);
+        socket.removeListener('data', handleData);
+
+        const payload = buffer.slice(10, totalLength);
+        try {
+          const response = JSON.parse(payload.toString());
+          resolve(response);
+        } catch (err) {
+          reject(new Error(`Invalid JSON response: ${err}`));
+        }
+      }
+    };
+
+    socket.on('data', handleData);
+  });
+}
 
 /**
  * Import pairing keys from pymobiledevice3 format
@@ -137,13 +286,67 @@ async function connectToDevice(
   try {
     const result = await tunnelService.connect();
     log.info('');
-    log.info('✅ WiFi tunnel connection successful!');
+    log.info('✅ WiFi pairing connection successful!');
     log.info(`   Remote Identifier: ${result.remoteIdentifier}`);
     log.info(`   Hostname: ${result.hostname}`);
     log.info(`   Port: ${result.port}`);
     log.info('');
 
+    // Try to create TCP listener for tunnel
+    log.info('Creating TCP listener for tunnel...');
+    try {
+      const listener = await tunnelService.createTcpListener();
+      log.info('');
+      log.info('✅ TCP Listener created!');
+      log.info(`   Listener Port: ${listener.port}`);
+      log.info('');
+
+      // Attempt TLS-PSK connection using OpenSSL
+      const pskHex = result.encryptionKey.toString('hex');
+      log.info('Attempting TLS-PSK connection using OpenSSL...');
+      log.info(`   Target: ${ip}:${listener.port}`);
+
+      try {
+        const tlsPskSocket = await connectWithTlsPsk(
+          ip,
+          listener.port,
+          pskHex,
+        );
+        log.info('');
+        log.info('✅ TLS-PSK connection established!');
+
+        // Now try to exchange CDTunnel parameters
+        log.info('Exchanging CDTunnel parameters...');
+        const tunnelInfo = await exchangeCDTunnelParams(tlsPskSocket);
+        log.info('');
+        log.info('✅ CDTunnel parameters exchanged!');
+        log.info(`   Server Address: ${tunnelInfo.serverAddress}`);
+        log.info(`   Server RSD Port: ${tunnelInfo.serverRSDPort}`);
+        log.info(`   Client Address: ${tunnelInfo.clientParameters?.address}`);
+        log.info(`   MTU: ${tunnelInfo.clientParameters?.mtu}`);
+        log.info('');
+        log.info('🎉 WiFi tunnel ready for RSD services!');
+        log.info('   Use these settings to connect to RSD:');
+        log.info(`   --rsd ${tunnelInfo.serverAddress} ${tunnelInfo.serverRSDPort}`);
+      } catch (tlsError) {
+        log.error(`TLS-PSK connection failed: ${tlsError}`);
+        log.info('');
+        log.info('📝 Manual TLS-PSK connection info:');
+        log.info(`   Host: ${ip}`);
+        log.info(`   Port: ${listener.port}`);
+        log.info(`   PSK (hex): ${pskHex}`);
+        log.info('');
+        log.info('   Try with OpenSSL:');
+        log.info(
+          `   openssl s_client -connect ${ip}:${listener.port} -psk ${pskHex} -psk_identity "" -tls1_2`,
+        );
+      }
+    } catch (listenerError) {
+      log.error(`Failed to create TCP listener: ${listenerError}`);
+    }
+
     // Keep connection open for inspection
+    log.info('');
     log.info('Connection established. Press Ctrl+C to disconnect...');
 
     await new Promise<void>((resolve) => {

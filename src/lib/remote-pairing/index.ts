@@ -15,6 +15,7 @@ export {
 export {
   RemotePairingTunnelService,
   type RemotePairingTunnelResult,
+  type ListenerResult,
 } from './remote-pairing-tunnel-service.js';
 
 export {
