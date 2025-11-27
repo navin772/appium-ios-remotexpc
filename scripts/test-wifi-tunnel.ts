@@ -32,6 +32,7 @@ import {
   getRemotePairingStorage,
 } from '../src/lib/remote-pairing/index.js';
 import { parsePlist } from '../src/lib/plist/index.js';
+import { TunTap } from 'appium-ios-tuntap';
 
 const log = logger.getLogger('WiFiTunnelTest');
 
@@ -117,6 +118,67 @@ async function connectWithTlsPsk(
         resolve(wrapper);
       }
     }, 1000);
+  });
+}
+
+/**
+ * Start bidirectional packet forwarding between TUN and socket
+ */
+function startPacketForwarding(tun: TunTap, socket: net.Socket): void {
+  let buffer = Buffer.alloc(0);
+
+  // Socket -> TUN (device to local)
+  socket.on('data', (data: Buffer) => {
+    buffer = Buffer.concat([buffer, data]);
+
+    // Process complete IPv6 packets
+    let offset = 0;
+    while (offset + 40 <= buffer.length) {
+      const header = buffer.slice(offset, offset + 40);
+      const version = (header[0] >> 4) & 0x0f;
+
+      if (version !== 6) {
+        offset++;
+        continue;
+      }
+
+      const payloadLength = header.readUInt16BE(4);
+      const totalLength = 40 + payloadLength;
+
+      if (offset + totalLength > buffer.length) {
+        break;
+      }
+
+      const packet = buffer.slice(offset, offset + totalLength);
+      try {
+        tun.write(packet);
+      } catch (err) {
+        log.debug(`TUN write error: ${err}`);
+      }
+
+      offset += totalLength;
+    }
+
+    if (offset > 0) {
+      buffer = buffer.slice(offset);
+    }
+  });
+
+  // TUN -> Socket (local to device)
+  const readInterval = setInterval(() => {
+    try {
+      const data = tun.read(16384);
+      if (data && data.length > 0) {
+        (socket as any).write(data);
+      }
+    } catch (err) {
+      // Ignore read errors (non-blocking)
+    }
+  }, 5);
+
+  // Cleanup on socket close
+  socket.on('close', () => {
+    clearInterval(readInterval);
   });
 }
 
@@ -325,9 +387,54 @@ async function connectToDevice(
         log.info(`   Client Address: ${tunnelInfo.clientParameters?.address}`);
         log.info(`   MTU: ${tunnelInfo.clientParameters?.mtu}`);
         log.info('');
-        log.info('🎉 WiFi tunnel ready for RSD services!');
-        log.info('   Use these settings to connect to RSD:');
-        log.info(`   --rsd ${tunnelInfo.serverAddress} ${tunnelInfo.serverRSDPort}`);
+
+        // Set up TUN interface
+        log.info('Setting up TUN interface...');
+        const tun = new TunTap();
+        if (!tun.open()) {
+          throw new Error('Failed to open TUN device');
+        }
+        log.info(`   TUN device opened: ${tun.name}`);
+
+        // Configure TUN with client address and MTU
+        await tun.configure(
+          tunnelInfo.clientParameters.address,
+          tunnelInfo.clientParameters.mtu,
+        );
+        log.info(`   Configured with address: ${tunnelInfo.clientParameters.address}`);
+
+        // Add route for server address
+        await tun.addRoute(`${tunnelInfo.serverAddress}/128`);
+        log.info(`   Added route to: ${tunnelInfo.serverAddress}`);
+
+        // Start packet forwarding
+        log.info('Starting packet forwarding...');
+        startPacketForwarding(tun, tlsPskSocket);
+
+        log.info('');
+        log.info('🎉 WiFi tunnel ACTIVE and ready for RSD services!');
+        log.info('');
+        log.info('   ╔════════════════════════════════════════════════════╗');
+        log.info('   ║  RSD Connection Info                               ║');
+        log.info('   ╠════════════════════════════════════════════════════╣');
+        log.info(`   ║  Address: ${tunnelInfo.serverAddress.padEnd(27)}║`);
+        log.info(`   ║  Port:    ${String(tunnelInfo.serverRSDPort).padEnd(27)}║`);
+        log.info('   ╚════════════════════════════════════════════════════╝');
+        log.info('');
+        log.info('   Example commands to test RSD services:');
+        log.info(`   pymobiledevice3 developer dvt ls / --rsd ${tunnelInfo.serverAddress} ${tunnelInfo.serverRSDPort}`);
+        log.info('');
+
+        // Keep running and handle cleanup
+        await new Promise<void>((resolve) => {
+          process.on('SIGINT', () => {
+            log.info('\nShutting down WiFi tunnel...');
+            tun.close();
+            (tlsPskSocket as any).destroy();
+            tunnelService.close().then(resolve);
+          });
+        });
+        return; // Don't fall through to the outer cleanup
       } catch (tlsError) {
         log.error(`TLS-PSK connection failed: ${tlsError}`);
         log.info('');
