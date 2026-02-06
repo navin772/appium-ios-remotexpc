@@ -182,6 +182,34 @@ export class DeviceInfo extends BaseInstrument {
   }
 
   /**
+   * Get the list of available process attributes for sysmontap monitoring.
+   *
+   * These attribute names describe the fields returned per-process in sysmontap data.
+   * Common attributes include: pid, name, cpuUsage, physFootprint, threadCount,
+   * memResidentSize, memVirtualSize, diskBytesRead, diskBytesWritten, etc.
+   *
+   * @returns Array of process attribute names supported by the device
+   */
+  async sysmonProcessAttributes(): Promise<string[]> {
+    const result = await this.requestInformation('sysmonProcessAttributes');
+    return Array.isArray(result) ? result : [];
+  }
+
+  /**
+   * Get the list of available system attributes for sysmontap monitoring.
+   *
+   * These attribute names describe the fields returned for system-wide stats.
+   * Common attributes include: netBytesIn, netBytesOut, threadCount, physMemSize,
+   * vmFaults, vmPageIns, diskBytesRead, diskBytesWritten, etc.
+   *
+   * @returns Array of system attribute names supported by the device
+   */
+  async sysmonSystemAttributes(): Promise<string[]> {
+    const result = await this.requestInformation('sysmonSystemAttributes');
+    return Array.isArray(result) ? result : [];
+  }
+
+  /**
    * Generic method to request information from the device.
    * @param selectorName - The selector name to call
    * @param arg - Optional argument to pass to the selector

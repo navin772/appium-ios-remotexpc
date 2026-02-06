@@ -154,6 +154,22 @@ export class NSKeyedArchiverDecoder {
       return result;
     }
 
+    // Handle NSData/NSMutableData — return the raw Buffer directly.
+    // NSData archives have a single `NS.data` key alongside `$class`.
+    if ('NS.data' in obj && !('NS.keys' in obj) && !('NS.objects' in obj)) {
+      const dataRef = obj['NS.data'];
+      let rawData: any;
+      if (typeof dataRef === 'object' && dataRef && 'CF$UID' in dataRef) {
+        rawData = this.decodeObject(dataRef.CF$UID, visited, depth + 1);
+      } else {
+        rawData = dataRef;
+      }
+
+      this.decoded.set(index, rawData);
+      visited.delete(index);
+      return rawData;
+    }
+
     // Handle regular objects - just return as-is but resolve references
     const result: any = {};
     for (const [key, value] of Object.entries(obj)) {

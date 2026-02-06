@@ -30,6 +30,7 @@ import { LocationSimulation } from './services/ios/dvt/instruments/location-simu
 import { NetworkMonitor } from './services/ios/dvt/instruments/network-monitor.js';
 import { Notifications } from './services/ios/dvt/instruments/notifications.js';
 import { Screenshot } from './services/ios/dvt/instruments/screenshot.js';
+import { Sysmontap } from './services/ios/dvt/instruments/sysmontap.js';
 import { HouseArrestService } from './services/ios/house-arrest/index.js';
 import { InstallationProxyService } from './services/ios/installation-proxy/index.js';
 import { MisagentService } from './services/ios/misagent/index.js';
@@ -275,6 +276,7 @@ export async function startDVTService(
   const deviceInfo = new DeviceInfo(dvtService);
   const notification = new Notifications(dvtService);
   const networkMonitor = new NetworkMonitor(dvtService);
+  const sysmontap = new Sysmontap(dvtService);
 
   return {
     remoteXPC: remoteXPC as RemoteXpcConnection,
@@ -287,6 +289,7 @@ export async function startDVTService(
     deviceInfo,
     notification,
     networkMonitor,
+    sysmontap,
   };
 }
 

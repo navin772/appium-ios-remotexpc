@@ -524,6 +524,110 @@ export class DVTSecureSocketProxyService extends BaseService {
   }
 
   /**
+   * Archive a complex value (dict/array) with full NSKeyedArchiver class
+   * metadata and UID-based cross-references.
+   *
+   * Unlike `archiveValue()` which embeds objects directly (sufficient for
+   * simple selectors and handshake data), this method produces archives
+   * compliant with NSSecureCoding, as required by receivers like
+   * DTTapAuthorizedAPI's `setConfig:`.
+   */
+  private archiveComplexValue(value: any): Buffer {
+    if (value === null || value === undefined) {
+      return this.archiveValue(value);
+    }
+
+    // Primitives don't need class metadata
+    if (
+      typeof value === 'string' ||
+      typeof value === 'number' ||
+      typeof value === 'boolean'
+    ) {
+      return this.archiveValue(value);
+    }
+
+    const objects: any[] = ['$null'];
+
+    // Shared class indices for deduplication (matching bpylist2 behavior)
+    let arrayClassIdx: number | null = null;
+    let dictClassIdx: number | null = null;
+
+    const encode = (val: any): PlistUID => {
+      if (val === null || val === undefined) {
+        return new PlistUID(0);
+      }
+
+      if (
+        typeof val === 'string' ||
+        typeof val === 'number' ||
+        typeof val === 'boolean'
+      ) {
+        const idx = objects.length;
+        objects.push(val);
+        return new PlistUID(idx);
+      }
+
+      if (Array.isArray(val)) {
+        const elementRefs = val.map((item) => encode(item));
+
+        // Use NSArray class matching bpylist2/pymd3 encoding
+        if (!arrayClassIdx) {
+          arrayClassIdx = objects.length;
+          objects.push({
+            $classes: ['NSArray'],
+            $classname: 'NSArray',
+          });
+        }
+
+        const arrayIdx = objects.length;
+        objects.push({
+          'NS.objects': elementRefs,
+          $class: new PlistUID(arrayClassIdx),
+        });
+
+        return new PlistUID(arrayIdx);
+      }
+
+      if (typeof val === 'object') {
+        const keys = Object.keys(val);
+        const keyRefs = keys.map((k) => encode(k));
+        const valueRefs = keys.map((k) => encode(val[k]));
+
+        // Use NSDictionary class matching bpylist2/pymd3 encoding
+        if (!dictClassIdx) {
+          dictClassIdx = objects.length;
+          objects.push({
+            $classes: ['NSDictionary'],
+            $classname: 'NSDictionary',
+          });
+        }
+
+        const dictIdx = objects.length;
+        objects.push({
+          'NS.keys': keyRefs,
+          'NS.objects': valueRefs,
+          $class: new PlistUID(dictClassIdx),
+        });
+
+        return new PlistUID(dictIdx);
+      }
+
+      const idx = objects.length;
+      objects.push(val);
+      return new PlistUID(idx);
+    };
+
+    const rootRef = encode(value);
+
+    return createBinaryPlist({
+      $version: 100000,
+      $archiver: 'NSKeyedArchiver',
+      $top: { root: rootRef },
+      $objects: objects,
+    });
+  }
+
+  /**
    * Archive a selector string for DTX messages
    */
   private archiveSelector(selector: string): Buffer {
@@ -575,6 +679,21 @@ export class DVTSecureSocketProxyService extends BaseService {
           lengthBuffer.writeUInt32LE(encodedPlist.length, 0);
           itemBuffers.push(lengthBuffer);
           itemBuffers.push(encodedPlist);
+          break;
+        }
+
+        case DTX_CONSTANTS.AUX_TYPE_COMPLEX_OBJECT: {
+          // Uses the same wire format as AUX_TYPE_OBJECT but with full
+          // NSKeyedArchiver class metadata for NSSecureCoding compliance
+          const encodedComplexPlist = this.archiveComplexValue(auxValue.value);
+          const complexLengthBuffer = Buffer.alloc(4);
+          complexLengthBuffer.writeUInt32LE(encodedComplexPlist.length, 0);
+
+          // Write as standard AUX_TYPE_OBJECT on the wire
+          typeBuffer.writeUInt32LE(DTX_CONSTANTS.AUX_TYPE_OBJECT, 0);
+
+          itemBuffers.push(complexLengthBuffer);
+          itemBuffers.push(encodedComplexPlist);
           break;
         }
 

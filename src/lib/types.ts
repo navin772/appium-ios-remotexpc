@@ -983,6 +983,183 @@ export interface NotificationService {
 }
 
 /**
+ * Configuration options for sysmontap monitoring
+ */
+export interface SysmontapConfig {
+  /**
+   * How often the device sends monitoring data, in milliseconds.
+   * Lower values provide more frequent updates but increase overhead.
+   * @default 500
+   */
+  updateRateMs?: number;
+
+  /**
+   * Sampling interval in milliseconds.
+   * Controls how often the device samples system/process metrics.
+   * @default 500
+   */
+  sampleIntervalMs?: number;
+}
+
+/**
+ * CPU usage statistics from system monitoring
+ */
+export interface CPUUsage {
+  /** CPU time spent on nice (low priority) processes */
+  niceLoad: number;
+  /** CPU time spent in system/kernel mode */
+  systemLoad: number;
+  /** Total CPU load across all cores */
+  totalLoad: number;
+  /** CPU time spent in user mode */
+  userLoad: number;
+  /** Total number of CPU cores on the device */
+  cpuCount: number;
+  /** Number of currently enabled CPU cores */
+  enabledCPUs: number;
+}
+
+/**
+ * System-wide statistics snapshot.
+ *
+ * Contains aggregated system metrics including memory, network, disk I/O,
+ * and CPU usage information.
+ *
+ * @example
+ * ```typescript
+ * const snapshot = await sysmontap.getSystemSnapshot();
+ * console.log(`CPU Load: ${snapshot.cpu.totalLoad}%`);
+ * console.log(`Net In: ${snapshot.system.netBytesIn} bytes`);
+ * console.log(`VM Faults: ${snapshot.system.vmFaults}`);
+ * ```
+ */
+export interface SystemSnapshot {
+  /**
+   * System-wide metrics keyed by attribute name.
+   *
+   * Common keys include:
+   * - `netBytesIn`, `netBytesOut`, `netPacketsIn`, `netPacketsOut` - Network I/O
+   * - `physMemSize`, `vmSize`, `vmFreeCount`, `vmActiveCount` - Memory
+   * - `vmFaults`, `vmPageIns`, `vmPageOuts`, `vmCompressions` - VM operations
+   * - `diskBytesRead`, `diskBytesWritten`, `diskReadOps`, `diskWriteOps` - Disk I/O
+   * - `threadCount` - Total system thread count
+   */
+  system: Record<string, number>;
+
+  /** CPU usage statistics */
+  cpu: CPUUsage;
+}
+
+/**
+ * Per-process metrics snapshot.
+ *
+ * Contains monitoring data for a single process. The `pid`, `name`,
+ * `cpuUsage`, and `physFootprint` fields are always present; additional
+ * device-reported attributes are included as dynamic properties.
+ *
+ * @example
+ * ```typescript
+ * const processes = await sysmontap.getProcessSnapshot();
+ * const topCpu = processes.sort((a, b) => b.cpuUsage - a.cpuUsage).slice(0, 5);
+ * ```
+ */
+export interface ProcessSnapshot {
+  /** Process identifier */
+  pid: number;
+  /** Process name */
+  name: string;
+  /** CPU usage percentage (may be 0 on the first sample) */
+  cpuUsage: number;
+  /** Physical memory footprint in bytes */
+  physFootprint: number;
+  /** Additional device-reported process attributes */
+  [key: string]: unknown;
+}
+
+/**
+ * System statistics event from sysmontap monitoring.
+ */
+export interface SysmontapSystemEvent {
+  type: 'system';
+  /** System-wide metrics keyed by attribute name */
+  system: Record<string, number>;
+  /** CPU usage statistics (may be absent in some messages) */
+  cpu?: CPUUsage;
+}
+
+/**
+ * Process list event from sysmontap monitoring.
+ */
+export interface SysmontapProcessesEvent {
+  type: 'processes';
+  /** Array of per-process metric snapshots */
+  processes: ProcessSnapshot[];
+}
+
+/**
+ * Union type for all sysmontap monitoring events.
+ */
+export type SysmontapEvent = SysmontapSystemEvent | SysmontapProcessesEvent;
+
+/**
+ * Sysmontap service interface for real-time system and process monitoring.
+ *
+ * Provides both one-shot snapshot methods and continuous streaming via
+ * async generators, covering the common use cases:
+ * - Get current system stats (CPU, memory, network, disk)
+ * - Get a snapshot of all running processes with metrics
+ * - Continuously monitor system and process activity
+ */
+export interface SysmontapService {
+  /**
+   * Get a one-shot snapshot of system-wide statistics.
+   *
+   * @param config - Optional monitoring configuration
+   * @returns System snapshot with metrics and CPU usage
+   *
+   * @example
+   * ```typescript
+   * const snapshot = await sysmontap.getSystemSnapshot();
+   * console.log(`CPU: ${snapshot.cpu.totalLoad}%, Cores: ${snapshot.cpu.cpuCount}`);
+   * console.log(`Net In: ${snapshot.system.netBytesIn}`);
+   * ```
+   */
+  getSystemSnapshot(config?: SysmontapConfig): Promise<SystemSnapshot>;
+
+  /**
+   * Get a one-shot snapshot of all running processes.
+   *
+   * @param config - Optional monitoring configuration
+   * @returns Array of process snapshots with per-process metrics
+   *
+   * @example
+   * ```typescript
+   * const processes = await sysmontap.getProcessSnapshot();
+   * const highCpu = processes.filter(p => p.cpuUsage > 5);
+   * ```
+   */
+  getProcessSnapshot(config?: SysmontapConfig): Promise<ProcessSnapshot[]>;
+
+  /**
+   * Async generator yielding continuous monitoring events.
+   *
+   * @param config - Optional monitoring configuration
+   * @yields SysmontapEvent - System or process monitoring events
+   *
+   * @example
+   * ```typescript
+   * for await (const event of sysmontap.events()) {
+   *   if (event.type === 'system') console.log(event.system);
+   *   if (event.type === 'processes') console.log(event.processes.length);
+   * }
+   * ```
+   */
+  events(
+    config?: SysmontapConfig,
+  ): AsyncGenerator<SysmontapEvent, void, unknown>;
+}
+
+/**
  * DVT service with connection
  * This allows callers to properly manage the connection lifecycle
  */
@@ -1005,6 +1182,8 @@ export interface DVTServiceWithConnection {
   notification: NotificationService;
   /** The NetworkMonitor service instance */
   networkMonitor: NetworkMonitorService;
+  /** The Sysmontap service instance for system and process monitoring */
+  sysmontap: SysmontapService;
   /** The RemoteXPC connection that can be used to close the connection */
   remoteXPC: RemoteXpcConnection;
 }

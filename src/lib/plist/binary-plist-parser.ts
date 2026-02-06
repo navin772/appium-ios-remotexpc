@@ -200,6 +200,21 @@ class BinaryPlistParser {
 
         return intValue; // Return as number if no precision loss
       }
+      case 16: {
+        // 128-bit integers (used by sysmontap and other instruments for large counters).
+        // Read as two 64-bit halves: high (signed) + low (unsigned), big-endian.
+        const high = this._buffer.readBigInt64BE(startOffset);
+        const low = this._buffer.readBigUInt64BE(startOffset + 8);
+        const combined = (high << 64n) | low;
+        const numValue = Number(combined);
+
+        // Return as Number when safe, BigInt otherwise
+        if (BigInt(numValue) !== combined) {
+          return combined;
+        }
+
+        return numValue;
+      }
       default:
         throw new TypeError(
           `Unexpected integer byte count: ${intByteCount}. Cannot parse integer value.`,

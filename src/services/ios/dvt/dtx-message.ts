@@ -48,6 +48,13 @@ export const DTX_CONSTANTS = {
   AUX_TYPE_OBJECT: 2,
   AUX_TYPE_INT32: 3,
   AUX_TYPE_INT64: 6,
+
+  /**
+   * Internal marker for objects requiring full NSKeyedArchiver encoding
+   * with NSDictionary/NSArray class metadata. Uses same wire format as
+   * AUX_TYPE_OBJECT but triggers complex archiving on the service side.
+   */
+  AUX_TYPE_COMPLEX_OBJECT: 102,
 } as const;
 
 /**
@@ -150,6 +157,16 @@ export class MessageAux {
    */
   appendObj(value: any): MessageAux {
     this.values.push({ type: DTX_CONSTANTS.AUX_TYPE_OBJECT, value });
+    return this;
+  }
+
+  /**
+   * Append a complex object requiring full NSKeyedArchiver encoding with
+   * NSDictionary/NSArray class metadata. Use this for arguments to methods
+   * that use NSSecureCoding (e.g., DTTapAuthorizedAPI's setConfig:).
+   */
+  appendComplexObj(value: any): MessageAux {
+    this.values.push({ type: DTX_CONSTANTS.AUX_TYPE_COMPLEX_OBJECT, value });
     return this;
   }
 
