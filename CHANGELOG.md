@@ -1,3 +1,9 @@
+## [5.12.1](https://github.com/appium/appium-ios-remotexpc/compare/v5.12.0...v5.12.1) (2026-07-26)
+
+### Miscellaneous Chores
+
+* Integrate oxc and release configs ([#280](https://github.com/appium/appium-ios-remotexpc/issues/280)) ([8e71496](https://github.com/appium/appium-ios-remotexpc/commit/8e714961a09df91fe91a0afa6478995dd3f9e64a))
+
 ## [5.12.0](https://github.com/appium/appium-ios-remotexpc/compare/v5.11.0...v5.12.0) (2026-07-21)
 
 ### Features
