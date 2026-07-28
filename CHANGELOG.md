@@ -1,3 +1,9 @@
+## [5.13.0](https://github.com/appium/appium-ios-remotexpc/compare/v5.12.1...v5.13.0) (2026-07-28)
+
+### Features
+
+* **crashreports:** implement advanced watch and sysdiagnose methods ([#282](https://github.com/appium/appium-ios-remotexpc/issues/282)) ([a413072](https://github.com/appium/appium-ios-remotexpc/commit/a41307204a6f3041d6107e931214d221718866b7))
+
 ## [5.12.1](https://github.com/appium/appium-ios-remotexpc/compare/v5.12.0...v5.12.1) (2026-07-26)
 
 ### Miscellaneous Chores
