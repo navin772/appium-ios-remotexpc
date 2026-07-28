@@ -1,3 +1,9 @@
+## [5.13.1](https://github.com/appium/appium-ios-remotexpc/compare/v5.13.0...v5.13.1) (2026-07-28)
+
+### Miscellaneous Chores
+
+* Tune editorconfig ([149a4e3](https://github.com/appium/appium-ios-remotexpc/commit/149a4e3cf2e55a25e13b593d84ae0b8e81a8b091))
+
 ## [5.13.0](https://github.com/appium/appium-ios-remotexpc/compare/v5.12.1...v5.13.0) (2026-07-28)
 
 ### Features
