@@ -1,3 +1,9 @@
+## [5.13.2](https://github.com/appium/appium-ios-remotexpc/compare/v5.13.1...v5.13.2) (2026-08-01)
+
+### Miscellaneous Chores
+
+* Drop chai ([#284](https://github.com/appium/appium-ios-remotexpc/issues/284)) ([38aa79c](https://github.com/appium/appium-ios-remotexpc/commit/38aa79c0fabd852560644478cc2818cafffdf385))
+
 ## [5.13.1](https://github.com/appium/appium-ios-remotexpc/compare/v5.13.0...v5.13.1) (2026-07-28)
 
 ### Miscellaneous Chores
