@@ -1,3 +1,9 @@
+## [5.13.6](https://github.com/appium/appium-ios-remotexpc/compare/v5.13.5...v5.13.6) (2026-08-07)
+
+### Miscellaneous Chores
+
+* replace npm-run-all2 with a plain npm script chain ([#288](https://github.com/appium/appium-ios-remotexpc/issues/288)) ([de448d4](https://github.com/appium/appium-ios-remotexpc/commit/de448d4434e168f303dcdea52a9d999735d92254))
+
 ## [5.13.5](https://github.com/appium/appium-ios-remotexpc/compare/v5.13.4...v5.13.5) (2026-08-07)
 
 ### Bug Fixes
