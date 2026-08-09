@@ -1,3 +1,9 @@
+## [5.14.0](https://github.com/appium/appium-ios-remotexpc/compare/v5.13.6...v5.14.0) (2026-08-09)
+
+### Features
+
+* **display:** add CoreDevice DisplayService for HEVC/AAC screen and audio capture ([#283](https://github.com/appium/appium-ios-remotexpc/issues/283)) ([8d5c1fd](https://github.com/appium/appium-ios-remotexpc/commit/8d5c1fd452dde97c66f872488d4845e35795d509))
+
 ## [5.13.6](https://github.com/appium/appium-ios-remotexpc/compare/v5.13.5...v5.13.6) (2026-08-07)
 
 ### Miscellaneous Chores
