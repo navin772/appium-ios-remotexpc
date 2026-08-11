@@ -1,3 +1,9 @@
+## [5.14.2](https://github.com/appium/appium-ios-remotexpc/compare/v5.14.1...v5.14.2) (2026-08-11)
+
+### Bug Fixes
+
+* **display:** stop captures when the recording's output file cannot be created ([#290](https://github.com/appium/appium-ios-remotexpc/issues/290)) ([18ad748](https://github.com/appium/appium-ios-remotexpc/commit/18ad7480bf5a82888a7ea9a574e937ce11b5eaba))
+
 ## [5.14.1](https://github.com/appium/appium-ios-remotexpc/compare/v5.14.0...v5.14.1) (2026-08-11)
 
 ### Bug Fixes
