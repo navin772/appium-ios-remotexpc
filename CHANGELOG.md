@@ -1,3 +1,9 @@
+## [5.14.3](https://github.com/appium/appium-ios-remotexpc/compare/v5.14.2...v5.14.3) (2026-08-11)
+
+### Bug Fixes
+
+* **display:** close the video writer when the audio writer's close throws ([#291](https://github.com/appium/appium-ios-remotexpc/issues/291)) ([ee8f381](https://github.com/appium/appium-ios-remotexpc/commit/ee8f381d867dfe703e407462ad7da0184b59a67d))
+
 ## [5.14.2](https://github.com/appium/appium-ios-remotexpc/compare/v5.14.1...v5.14.2) (2026-08-11)
 
 ### Bug Fixes
