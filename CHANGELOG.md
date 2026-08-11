@@ -1,3 +1,9 @@
+## [5.14.1](https://github.com/appium/appium-ios-remotexpc/compare/v5.14.0...v5.14.1) (2026-08-11)
+
+### Bug Fixes
+
+* **display:** surface screen-recording write errors instead of crashing ([#289](https://github.com/appium/appium-ios-remotexpc/issues/289)) ([2ef7852](https://github.com/appium/appium-ios-remotexpc/commit/2ef7852814d01bcc08202e82434ebea74424d8de))
+
 ## [5.14.0](https://github.com/appium/appium-ios-remotexpc/compare/v5.13.6...v5.14.0) (2026-08-09)
 
 ### Features
