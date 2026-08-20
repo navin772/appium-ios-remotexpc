@@ -1,3 +1,9 @@
+## [5.14.5](https://github.com/appium/appium-ios-remotexpc/compare/v5.14.4...v5.14.5) (2026-08-20)
+
+### Bug Fixes
+
+* **plist:** only read direct-child keys when parsing a dict ([#295](https://github.com/appium/appium-ios-remotexpc/issues/295)) ([7d8c5c3](https://github.com/appium/appium-ios-remotexpc/commit/7d8c5c3a22f4f8197b0634cd1253108523717b7b))
+
 ## [5.14.4](https://github.com/appium/appium-ios-remotexpc/compare/v5.14.3...v5.14.4) (2026-08-12)
 
 ### Bug Fixes
