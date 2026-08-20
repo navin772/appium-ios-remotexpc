@@ -1,3 +1,9 @@
+## [5.14.6](https://github.com/appium/appium-ios-remotexpc/compare/v5.14.5...v5.14.6) (2026-08-20)
+
+### Bug Fixes
+
+* bind tunnel registry server to localhost only ([#296](https://github.com/appium/appium-ios-remotexpc/issues/296)) ([f837953](https://github.com/appium/appium-ios-remotexpc/commit/f83795348d2e6d8f6da1b8203bb7aab7b919aa7b))
+
 ## [5.14.5](https://github.com/appium/appium-ios-remotexpc/compare/v5.14.4...v5.14.5) (2026-08-20)
 
 ### Bug Fixes
