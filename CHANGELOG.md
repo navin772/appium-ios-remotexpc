@@ -1,3 +1,9 @@
+## [5.15.2](https://github.com/appium/appium-ios-remotexpc/compare/v5.15.1...v5.15.2) (2026-08-21)
+
+### Bug Fixes
+
+* surface webinspector receive errors to the message iterator ([#299](https://github.com/appium/appium-ios-remotexpc/issues/299)) ([d5df32b](https://github.com/appium/appium-ios-remotexpc/commit/d5df32b489675031f446bbd2123dddbec9b21a8d))
+
 ## [5.15.1](https://github.com/appium/appium-ios-remotexpc/compare/v5.15.0...v5.15.1) (2026-08-21)
 
 ### Bug Fixes
