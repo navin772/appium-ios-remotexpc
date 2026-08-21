@@ -1,3 +1,9 @@
+## [5.15.0](https://github.com/appium/appium-ios-remotexpc/compare/v5.14.7...v5.15.0) (2026-08-21)
+
+### Features
+
+* **accessibility:** add AccessibilityAuditService for on-device audits and element inspection ([#293](https://github.com/appium/appium-ios-remotexpc/issues/293)) ([4b89ca2](https://github.com/appium/appium-ios-remotexpc/commit/4b89ca223b559a3977becb3babe87d0fdfc95dff))
+
 ## [5.14.7](https://github.com/appium/appium-ios-remotexpc/compare/v5.14.6...v5.14.7) (2026-08-21)
 
 ### Bug Fixes
