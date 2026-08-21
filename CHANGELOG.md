@@ -1,3 +1,9 @@
+## [5.15.1](https://github.com/appium/appium-ios-remotexpc/compare/v5.15.0...v5.15.1) (2026-08-21)
+
+### Bug Fixes
+
+* prevent crash on unhandled usbmux socket errors ([#298](https://github.com/appium/appium-ios-remotexpc/issues/298)) ([9d300d4](https://github.com/appium/appium-ios-remotexpc/commit/9d300d4aca1b0a0509cded6c7fd54d27f8caa6f1))
+
 ## [5.15.0](https://github.com/appium/appium-ios-remotexpc/compare/v5.14.7...v5.15.0) (2026-08-21)
 
 ### Features
