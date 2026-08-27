@@ -1,3 +1,9 @@
+## [5.16.1](https://github.com/appium/appium-ios-remotexpc/compare/v5.16.0...v5.16.1) (2026-08-27)
+
+### Bug Fixes
+
+* **usbmux:** handle decoder errors and preserve unconsumed bytes on connect ([#304](https://github.com/appium/appium-ios-remotexpc/issues/304)) ([52db21c](https://github.com/appium/appium-ios-remotexpc/commit/52db21c748de050e294219358d7a9ed85688e960))
+
 ## [5.16.0](https://github.com/appium/appium-ios-remotexpc/compare/v5.15.5...v5.16.0) (2026-08-27)
 
 ### Features
