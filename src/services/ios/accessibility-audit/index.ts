@@ -117,6 +117,14 @@ export class AccessibilityAuditService {
    */
   private settingTypes: Map<string, number | undefined> | undefined;
 
+  /**
+   * Supported audit types, read once per connection.
+   *
+   * Like the setting catalogue this is fixed for the device, so validating a
+   * name costs one round trip per connection rather than one per audit.
+   */
+  private auditTypeNames: Set<string> | undefined;
+
   private constructor(private readonly transport: AxAuditDtxTransport) {}
 
   /**
@@ -264,6 +272,7 @@ export class AccessibilityAuditService {
       : undefined;
 
     try {
+      await this.assertKnownAuditTypes(auditTypes);
       if (options.targetPid !== undefined) {
         // Narrows the audit to one process; omitted, the daemon uses the
         // foreground app.
@@ -284,6 +293,39 @@ export class AccessibilityAuditService {
       this.auditInFlight = false;
       stopIssues();
       stopLog?.();
+    }
+  }
+
+  /**
+   * Rejects audit types the device does not implement.
+   *
+   * An unrecognised name makes the daemon return neither issues nor a
+   * completion, and that connection can never run another audit — so the name
+   * must never reach the device.
+   */
+  private async assertKnownAuditTypes(auditTypes: string[]): Promise<void> {
+    if (auditTypes.length === 0) {
+      return;
+    }
+    // Deliberately not the caller's `timeoutMs`: that budget is for the audit
+    // itself, and reusing it here would let a long audit spend it twice.
+    const known = this.auditTypeNames ?? new Set(await this.getSupportedAuditTypes());
+    if (known.size === 0) {
+      // Nothing to validate against. Caching an empty catalogue would reject
+      // every type from here on — including after the daemon recovered — which
+      // is worse than the wedge this guards against, so let the call through.
+      log.debug('Device reported no supported audit types; skipping validation');
+      return;
+    }
+    this.auditTypeNames = known;
+
+    const unknown = auditTypes.filter((auditType) => !known.has(auditType));
+    if (unknown.length > 0) {
+      throw new Error(
+        `Unknown ${util.pluralize('audit type', unknown.length)} ` +
+          `${unknown.map((auditType) => JSON.stringify(auditType)).join(', ')}; ` +
+          `the device supports: ${[...known].join(', ')}`,
+      );
     }
   }
 
