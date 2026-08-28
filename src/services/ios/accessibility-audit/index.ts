@@ -59,6 +59,23 @@ const MONITORED_EVENT_FOCUS = 2;
 const MONITORED_EVENT_OFF = 0;
 
 /**
+ * Where {@link AccessibilityAuditService.moveFocus} sends the accessibility
+ * focus. These are the daemon's own `direction` values, verified live.
+ */
+export const AxFocusDirection = {
+  Previous: 3,
+  Next: 4,
+  First: 5,
+  Last: 6,
+} as const;
+
+/** A value of {@link AxFocusDirection}. */
+export type AxFocusDirection = (typeof AxFocusDirection)[keyof typeof AxFocusDirection];
+
+/** Safety valve for {@link AccessibilityAuditService.walkElements}. */
+const MAX_WALK_ELEMENTS = 1000;
+
+/**
  * One accessibility setting reported by
  * {@link AccessibilityAuditService.getAccessibilitySettings}.
  *
@@ -408,6 +425,131 @@ export class AccessibilityAuditService {
         this.setMonitoredEventType(MONITORED_EVENT_OFF);
       }
     };
+  }
+
+  /**
+   * Moves the device's accessibility focus and resolves with the element it
+   * lands on — the same panel {@link getFocusedElement} returns, plus a handle
+   * in `element`.
+   *
+   * The daemon only reports focus that actually *changed*, so a move with
+   * nowhere to go — `First` when focus is already on the first element —
+   * emits nothing and rejects on timeout. Focus does wrap: `Next` from the last
+   * element returns to the first.
+   *
+   * @param direction Where to move; see {@link AxFocusDirection}.
+   * @param options Timeout, and whether to draw the on-device highlight.
+   */
+  async moveFocus(direction: AxFocusDirection, options: InspectOptions = {}): Promise<AxInspectedElement> {
+    const {timeoutMs = 15000, showVisuals = false} = options;
+    const pushed = this.transport.waitForInbound('hostInspectorCurrentElementChanged:', timeoutMs);
+    this.setMonitoredEventType(MONITORED_EVENT_FOCUS);
+    if (showVisuals) {
+      this.setShowVisuals(true);
+    }
+    try {
+      const aux = new MessageAux();
+      // Every value is envelope-wrapped: a bare `{direction: n}` is accepted on
+      // the wire but moves nothing.
+      aux.appendObj({
+        ObjectType: 'passthrough',
+        Value: {
+          allowNonAX: {ObjectType: 'passthrough', Value: 0},
+          direction: {ObjectType: 'passthrough', Value: direction},
+          includeContainers: {ObjectType: 'passthrough', Value: 1},
+        },
+      });
+      this.transport.invokeOneway('deviceInspectorMoveWithOptions:', aux);
+      const [payload] = await pushed;
+      return toInspectedElement(deserializeAxObject(payload));
+    } finally {
+      if (showVisuals) {
+        this.setShowVisuals(false);
+      }
+      // Leave monitoring armed if an observer is relying on it.
+      if (this.observerCount === 0) {
+        this.setMonitoredEventType(MONITORED_EVENT_OFF);
+      }
+    }
+  }
+
+  /**
+   * Walks the focusable elements of whatever is on screen, in focus order.
+   *
+   * Moves focus forward, yielding each element, and stops when focus returns to
+   * the one it started on — verified live: the daemon wraps from the last
+   * element back to the first rather than reporting an end.
+   *
+   * The stop is keyed on what the element announces, not on
+   * {@link AxElement.platformElement}: the daemon issues a fresh handle for
+   * every focus event, so the same element carries different handles on
+   * successive visits. A screen whose *first* element announces exactly the
+   * same text as a later one therefore ends the walk early.
+   *
+   * A screen with nothing focusable yields nothing. Note the daemon reports what
+   * is actually drawn, so an app that has not rendered looks empty.
+   *
+   * Moving focus is a device-wide action: it leaves the focus wherever the walk
+   * finished.
+   *
+   * Read an element's attributes **inside** the loop. `element` is only valid
+   * while it holds focus — {@link getElementAttributeValue} returns real values
+   * for the element being yielded and `null` for one the walk has moved past.
+   *
+   * @example
+   * ```ts
+   * for await (const focused of audit.walkElements()) {
+   *   const basic = focused.sections.find((section) => section.title === 'Basic');
+   *   const label = basic?.attributes.find((attribute) => attribute.name === 'Label');
+   *   // Read now: after the next iteration this element is no longer focused.
+   *   const value = label && focused.element
+   *     ? await audit.getElementAttributeValue(focused.element, label)
+   *     : undefined;
+   * }
+   * ```
+   *
+   * @param options Timeout per step, and whether to draw the on-device highlight.
+   */
+  async *walkElements(options: InspectOptions = {}): AsyncGenerator<AxInspectedElement, void, unknown> {
+    let startedAt: string | undefined;
+    let direction: AxFocusDirection = AxFocusDirection.First;
+
+    for (let step = 0; step < MAX_WALK_ELEMENTS; step += 1) {
+      let element: AxInspectedElement;
+      try {
+        element = await this.moveFocus(direction, options);
+      } catch (error) {
+        if (step > 0) {
+          throw error;
+        }
+        // Focus was already on the first element, so `First` changed nothing and
+        // the daemon stayed silent. Walking forward from here still reaches
+        // every element — focus wraps — just starting one along.
+        log.debug('Focus was already at the first element; walking from where it is');
+        direction = AxFocusDirection.Next;
+        continue;
+      }
+      direction = AxFocusDirection.Next;
+
+      if (!element.element?.platformElement) {
+        // Nothing focusable — an empty or undrawn screen.
+        log.debug('Focus returned no element; ending the walk');
+        return;
+      }
+      const announcement = element.caption ?? element.spokenDescription;
+      if (announcement === undefined) {
+        log.debug('Focus returned an element with no announcement; ending the walk');
+        return;
+      }
+      if (startedAt === undefined) {
+        startedAt = announcement;
+      } else if (announcement === startedAt) {
+        // Back where the walk began: the ring is complete.
+        return;
+      }
+      yield element;
+    }
+    log.debug(`Walk stopped at the ${MAX_WALK_ELEMENTS}-element safety limit`);
   }
 
   /**
