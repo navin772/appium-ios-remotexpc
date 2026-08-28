@@ -1,3 +1,9 @@
+## [5.17.0](https://github.com/appium/appium-ios-remotexpc/compare/v5.16.3...v5.17.0) (2026-08-28)
+
+### Features
+
+* **accessibility:** decode element rectangles on audit issues ([#307](https://github.com/appium/appium-ios-remotexpc/issues/307)) ([f79c216](https://github.com/appium/appium-ios-remotexpc/commit/f79c2162cd12b87ecaf5281961dba6e61c6e8ccb))
+
 ## [5.16.3](https://github.com/appium/appium-ios-remotexpc/compare/v5.16.2...v5.16.3) (2026-08-28)
 
 ### Bug Fixes
