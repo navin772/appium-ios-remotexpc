@@ -1,3 +1,9 @@
+## [5.16.3](https://github.com/appium/appium-ios-remotexpc/compare/v5.16.2...v5.16.3) (2026-08-28)
+
+### Bug Fixes
+
+* **accessibility:** reject unknown audit types before they reach the device ([#306](https://github.com/appium/appium-ios-remotexpc/issues/306)) ([9b4200b](https://github.com/appium/appium-ios-remotexpc/commit/9b4200b419817aae9969a99e3e103e28e8e03115))
+
 ## [5.16.2](https://github.com/appium/appium-ios-remotexpc/compare/v5.16.1...v5.16.2) (2026-08-27)
 
 ### Bug Fixes
