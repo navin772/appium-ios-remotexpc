@@ -1,3 +1,9 @@
+## [5.17.1](https://github.com/appium/appium-ios-remotexpc/compare/v5.17.0...v5.17.1) (2026-08-29)
+
+### Bug Fixes
+
+* **deps:** require appium-ios-tuntap ^2.0.0 ([#308](https://github.com/appium/appium-ios-remotexpc/issues/308)) ([696f887](https://github.com/appium/appium-ios-remotexpc/commit/696f887438948587616ca6a35e1745792671eac8))
+
 ## [5.17.0](https://github.com/appium/appium-ios-remotexpc/compare/v5.16.3...v5.17.0) (2026-08-28)
 
 ### Features
