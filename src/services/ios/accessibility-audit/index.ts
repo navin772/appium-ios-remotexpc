@@ -69,6 +69,9 @@ export enum AxFocusDirection {
   Last = 6,
 }
 
+/** Default wait for the focus event a move produces. */
+const DEFAULT_FOCUS_TIMEOUT_MS = 15000;
+
 /** Safety valve for {@link AccessibilityAuditService.walkElements}. */
 const MAX_WALK_ELEMENTS = 1000;
 
@@ -130,6 +133,7 @@ export class AccessibilityAuditService {
 
   /** Live {@link observeFocusedElement} subscriptions; monitoring stays armed while > 0. */
   private observerCount = 0;
+  private focusMoveInFlight = false;
 
   /** Guards {@link runAudit} against overlapping calls on one instance. */
   private auditInFlight = false;
@@ -445,6 +449,9 @@ export class AccessibilityAuditService {
    * emits nothing and rejects on timeout. Focus does wrap: `Next` from the last
    * element returns to the first.
    *
+   * Only one focus move may be in flight per instance — a second concurrent call
+   * rejects, since both would be resolved by the same push.
+   *
    * On timeout the move has already been sent, and nothing ties the daemon's
    * push back to the move that caused it. A push landing after the wait gave up
    * is delivered to the next caller, which then sees a stale element — so treat
@@ -456,39 +463,63 @@ export class AccessibilityAuditService {
    * @param options Timeout, and whether to draw the on-device highlight.
    */
   async moveFocus(direction: AxFocusDirection, options: InspectOptions = {}): Promise<AxInspectedElement> {
-    const {timeoutMs = 15000, showVisuals = false} = options;
+    const {timeoutMs = DEFAULT_FOCUS_TIMEOUT_MS, showVisuals = false} = options;
+    this.beginFocusWork(showVisuals);
+    try {
+      return await this.requestFocusMove(direction, timeoutMs);
+    } finally {
+      this.endFocusWork(showVisuals);
+    }
+  }
+
+  /**
+   * Sends one move and waits for the focus event it produces.
+   *
+   * Assumes monitoring is already armed, so a walk can arm once instead of once
+   * per step.
+   */
+  private async requestFocusMove(direction: AxFocusDirection, timeoutMs: number): Promise<AxInspectedElement> {
+    // Registered before the move is sent so the push cannot be missed, and
+    // awaited unconditionally: an abandoned waiter rejects with nothing
+    // listening once the connection closes, which is an unhandled rejection
+    // rather than an error the caller can catch.
+    const pushed = this.transport.waitForInbound('hostInspectorCurrentElementChanged:', timeoutMs);
+    const aux = new MessageAux();
+    // Every value is envelope-wrapped: a bare `{direction: n}` is accepted on
+    // the wire but moves nothing.
+    aux.appendObj({
+      ObjectType: 'passthrough',
+      Value: {
+        allowNonAX: {ObjectType: 'passthrough', Value: 0},
+        direction: {ObjectType: 'passthrough', Value: direction},
+        includeContainers: {ObjectType: 'passthrough', Value: 1},
+      },
+    });
+    this.transport.invokeOneway('deviceInspectorMoveWithOptions:', aux);
+    const [payload] = await pushed;
+    return toInspectedElement(deserializeAxObject(payload));
+  }
+
+  /** Arms monitoring for focus work and rejects a second concurrent caller. */
+  private beginFocusWork(showVisuals: boolean): void {
+    if (this.focusMoveInFlight) {
+      throw new Error('A focus move is already running on this service instance; await it or use a second instance');
+    }
+    this.focusMoveInFlight = true;
     this.setMonitoredEventType(MONITORED_EVENT_FOCUS);
     if (showVisuals) {
       this.setShowVisuals(true);
     }
-    try {
-      // Registered before the move is sent so the push cannot be missed, and
-      // inside the try so it is always awaited: an abandoned waiter rejects with
-      // nothing listening once the connection closes, which is an unhandled
-      // rejection rather than an error the caller can catch.
-      const pushed = this.transport.waitForInbound('hostInspectorCurrentElementChanged:', timeoutMs);
-      const aux = new MessageAux();
-      // Every value is envelope-wrapped: a bare `{direction: n}` is accepted on
-      // the wire but moves nothing.
-      aux.appendObj({
-        ObjectType: 'passthrough',
-        Value: {
-          allowNonAX: {ObjectType: 'passthrough', Value: 0},
-          direction: {ObjectType: 'passthrough', Value: direction},
-          includeContainers: {ObjectType: 'passthrough', Value: 1},
-        },
-      });
-      this.transport.invokeOneway('deviceInspectorMoveWithOptions:', aux);
-      const [payload] = await pushed;
-      return toInspectedElement(deserializeAxObject(payload));
-    } finally {
-      if (showVisuals) {
-        this.setShowVisuals(false);
-      }
-      // Leave monitoring armed if an observer is relying on it.
-      if (this.observerCount === 0) {
-        this.setMonitoredEventType(MONITORED_EVENT_OFF);
-      }
+  }
+
+  /** Undoes {@link beginFocusWork}, leaving monitoring armed for any observer. */
+  private endFocusWork(showVisuals: boolean): void {
+    this.focusMoveInFlight = false;
+    if (showVisuals) {
+      this.setShowVisuals(false);
+    }
+    if (this.observerCount === 0) {
+      this.setMonitoredEventType(MONITORED_EVENT_OFF);
     }
   }
 
@@ -536,74 +567,82 @@ export class AccessibilityAuditService {
    * @param options Timeout per step, and whether to draw the on-device highlight.
    */
   async *walkElements(options: InspectOptions = {}): AsyncGenerator<AxInspectedElement, void, unknown> {
+    const {timeoutMs = DEFAULT_FOCUS_TIMEOUT_MS, showVisuals = false} = options;
     const steps = new Set<string>();
+    let startedAt: string | undefined;
     let previous: string | undefined;
-    let pending: AxInspectedElement | undefined;
-    let direction: AxFocusDirection = AxFocusDirection.First;
+    let held: AxInspectedElement | undefined;
 
-    for (let step = 0; step < MAX_WALK_ELEMENTS; step += 1) {
-      let element: AxInspectedElement;
-      try {
-        element = await this.moveFocus(
-          direction,
-          step === 0
-            ? {
-                ...options,
-                timeoutMs: Math.min(options.timeoutMs ?? FOCUS_FIRST_PROBE_TIMEOUT_MS, FOCUS_FIRST_PROBE_TIMEOUT_MS),
-              }
-            : options,
-        );
-      } catch (error) {
-        if (step > 0) {
-          throw error;
+    this.beginFocusWork(showVisuals);
+    try {
+      for (let step = 0; step < MAX_WALK_ELEMENTS; step += 1) {
+        let element: AxInspectedElement;
+        try {
+          element =
+            step === 0
+              ? await this.requestFocusMove(AxFocusDirection.First, Math.min(timeoutMs, FOCUS_FIRST_PROBE_TIMEOUT_MS))
+              : await this.requestFocusMove(AxFocusDirection.Next, timeoutMs);
+        } catch {
+          if (step > 0) {
+            // Focus stopped moving. That is how a screen with a single focusable
+            // element ends, so the walk finishes with what it has rather than
+            // discarding it and rejecting.
+            log.debug('Focus stopped moving; ending the walk');
+            break;
+          }
+          // The opening move changed nothing, so focus already sits where the
+          // walk would have put it. `deviceInspectorFocusOnElement:` cannot be
+          // used to pick it up — it answers with a panel carrying no element
+          // handle — so the walk simply advances from here. Focus cycles, so
+          // every element is still reached, just starting one along.
+          log.debug('Opening move changed nothing; walking on from where focus is');
+          continue;
         }
-        // Focus was already on the first element, so `First` changed nothing and
-        // the daemon stayed silent. Walking forward from here still reaches
-        // every element — focus wraps — just starting one along.
-        log.debug('Focus was already at the first element; walking from where it is');
-        direction = AxFocusDirection.Next;
-        continue;
-      }
-      direction = AxFocusDirection.Next;
 
-      const announcement = element.element?.platformElement
-        ? (element.caption ?? element.spokenDescription)
-        : undefined;
-      if (announcement === undefined) {
-        // Nothing focusable, or nothing said about it: an empty or undrawn screen.
-        log.debug('Focus returned nothing to identify; ending the walk');
-        if (pending) {
-          yield pending;
+        const announcement = element.element?.platformElement
+          ? (element.caption ?? element.spokenDescription)
+          : undefined;
+        if (announcement === undefined) {
+          // Nothing focusable, or nothing said about it: an empty or undrawn screen.
+          log.debug('Focus returned nothing to identify; ending the walk');
+          break;
         }
-        return;
-      }
 
-      if (previous === undefined) {
+        if (previous === undefined) {
+          startedAt = announcement;
+        } else if (announcement !== previous) {
+          const transition = `${previous}\u0000${announcement}`;
+          if (steps.has(transition)) {
+            // The sequence is repeating, so anything held back is a revisit and
+            // goes with it.
+            log.debug('Focus began repeating an earlier sequence; ending the walk');
+            return;
+          }
+          steps.add(transition);
+        }
         previous = announcement;
-      } else if (announcement !== previous) {
-        const transition = `${previous}\u0000${announcement}`;
-        if (steps.has(transition)) {
-          // The sequence is repeating, so `pending` is a revisit rather than a
-          // new element and is dropped with it.
-          log.debug('Focus began repeating an earlier sequence; ending the walk');
-          return;
+
+        // Held back only to see whether it was the wrap; it was not.
+        if (held) {
+          yield held;
+          held = undefined;
         }
-        steps.add(transition);
-        previous = announcement;
+
+        if (step > 0 && announcement === startedAt) {
+          // Possibly the wrap. Decided on the next step, so that the element the
+          // walk opened on is not yielded twice.
+          held = element;
+        } else {
+          yield element;
+        }
       }
 
-      // Held back one element: whatever completes a repeat has to be discarded,
-      // and that is only known once the *next* element arrives.
-      if (pending) {
-        yield pending;
+      if (held) {
+        yield held;
       }
-      pending = element;
+    } finally {
+      this.endFocusWork(showVisuals);
     }
-
-    if (pending) {
-      yield pending;
-    }
-    log.debug(`Walk stopped at the ${MAX_WALK_ELEMENTS}-element safety limit`);
   }
 
   /**
