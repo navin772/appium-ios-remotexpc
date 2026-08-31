@@ -72,6 +72,12 @@ export enum AxFocusDirection {
 /** Default wait for the focus event a move produces. */
 const DEFAULT_FOCUS_TIMEOUT_MS = 15000;
 
+/**
+ * How many further elements must keep matching before a repeated step is taken
+ * as proof the walk has come round again.
+ */
+const WALK_PERIOD_CONFIRM_STEPS = 6;
+
 /** Safety valve for {@link AccessibilityAuditService.walkElements}. */
 const MAX_WALK_ELEMENTS = 1000;
 
@@ -538,9 +544,15 @@ export class AccessibilityAuditService {
    * therefore collapsed for repeat detection and still yielded individually,
    * and the walk stops only when a *pair* of announcements recurs.
    *
-   * The consequence worth knowing: a screen that legitimately repeats the same
-   * two announcements in sequence ends the walk early, and one where every
-   * element announces alike runs to the safety limit.
+   * A repeated step is treated as a hypothesis rather than proof: the walk keeps
+   * going and only stops once the announcements have kept matching one period
+   * back for several more elements. A screen that happens to take the same step
+   * twice is therefore walked in full, where believing the first repeat would
+   * have cut it short.
+   *
+   * The consequence worth knowing: a screen whose announcements repeat over a
+   * long enough stretch to satisfy that check still ends early, and one where
+   * every element announces alike runs to the safety limit.
    *
    * A screen with nothing focusable yields nothing. Note the daemon reports what
    * is actually drawn, so an app that has not rendered looks empty.
@@ -568,10 +580,13 @@ export class AccessibilityAuditService {
    */
   async *walkElements(options: InspectOptions = {}): AsyncGenerator<AxInspectedElement, void, unknown> {
     const {timeoutMs = DEFAULT_FOCUS_TIMEOUT_MS, showVisuals = false} = options;
-    const steps = new Set<string>();
-    let startedAt: string | undefined;
-    let previous: string | undefined;
-    let held: AxInspectedElement | undefined;
+    /** Every announcement seen so far, so a candidate period can be checked against it. */
+    const history: string[] = [];
+    /** Where each step between two announcements was first seen. */
+    const firstSeen = new Map<string, number>();
+    /** Elements not yet known to be new; dropped if the walk turns out to be repeating. */
+    let held: AxInspectedElement[] = [];
+    let candidate: {period: number; confirmed: number} | undefined;
 
     this.beginFocusWork(showVisuals);
     try {
@@ -608,38 +623,58 @@ export class AccessibilityAuditService {
           break;
         }
 
-        if (previous === undefined) {
-          startedAt = announcement;
-        } else if (announcement !== previous) {
-          const transition = `${previous}\u0000${announcement}`;
-          if (steps.has(transition)) {
-            // The sequence is repeating, so anything held back is a revisit and
-            // goes with it.
-            log.debug('Focus began repeating an earlier sequence; ending the walk');
-            return;
+        const index = history.length;
+        history.push(announcement);
+        if (index > 0 && announcement !== history[index - 1]) {
+          const transition = `${history[index - 1]}\u0000${announcement}`;
+          // Kept at its earliest index: the distance back to the *first* time a
+          // step was taken is what gives the true period.
+          const seenAt = firstSeen.get(transition);
+          if (seenAt === undefined) {
+            firstSeen.set(transition, index);
+          } else if (!candidate) {
+            // A repeated step only *suggests* the walk has come round again.
+            // Confirm it before believing it, by checking the announcements keep
+            // matching one period back.
+            candidate = {period: index - seenAt, confirmed: 0};
           }
-          steps.add(transition);
         }
-        previous = announcement;
+
+        if (candidate) {
+          const matches = history[index] === history[index - candidate.period];
+          if (matches) {
+            candidate.confirmed += 1;
+            held.push(element);
+            if (candidate.confirmed >= WALK_PERIOD_CONFIRM_STEPS) {
+              // The sequence really is repeating, so everything held back is a
+              // revisit and goes with it.
+              log.debug(`Walk came full circle after ${candidate.period} element(s)`);
+              return;
+            }
+            continue;
+          }
+          // The repeat was a coincidence — a screen may well take the same step
+          // twice without having come round. Nothing held was a revisit.
+          log.debug('A repeated step did not hold up; continuing the walk');
+          candidate = undefined;
+          yield* held;
+          held = [];
+        }
 
         // Held back only to see whether it was the wrap; it was not.
-        if (held) {
-          yield held;
-          held = undefined;
-        }
+        yield* held;
+        held = [];
 
-        if (step > 0 && announcement === startedAt) {
+        if (index > 0 && announcement === history[0]) {
           // Possibly the wrap. Decided on the next step, so that the element the
           // walk opened on is not yielded twice.
-          held = element;
+          held.push(element);
         } else {
           yield element;
         }
       }
 
-      if (held) {
-        yield held;
-      }
+      yield* held;
     } finally {
       this.endFocusWork(showVisuals);
     }
