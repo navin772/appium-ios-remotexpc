@@ -1,3 +1,9 @@
+## [5.17.2](https://github.com/appium/appium-ios-remotexpc/compare/v5.17.1...v5.17.2) (2026-08-31)
+
+### Performance Improvements
+
+* **plist:** resolve receivers on decode instead of 50ms polling ([#311](https://github.com/appium/appium-ios-remotexpc/issues/311)) ([97f8ad2](https://github.com/appium/appium-ios-remotexpc/commit/97f8ad27129a90937e96fc8dccd4d06115a691db))
+
 ## [5.17.1](https://github.com/appium/appium-ios-remotexpc/compare/v5.17.0...v5.17.1) (2026-08-29)
 
 ### Bug Fixes
