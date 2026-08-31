@@ -76,6 +76,17 @@ export type AxFocusDirection = (typeof AxFocusDirection)[keyof typeof AxFocusDir
 const MAX_WALK_ELEMENTS = 1000;
 
 /**
+ * How long to wait for the move onto the first element that opens a walk.
+ *
+ * When focus already sits there the daemon stays silent rather than answering,
+ * so this wait is what the walk pays to find that out. A move that is going to
+ * be answered is answered in tens of milliseconds, so this stays well clear of
+ * the caller's own budget, which would otherwise be spent in full before the
+ * walk could start.
+ */
+const FOCUS_FIRST_PROBE_TIMEOUT_MS = 2000;
+
+/**
  * One accessibility setting reported by
  * {@link AccessibilityAuditService.getAccessibilitySettings}.
  *
@@ -437,17 +448,28 @@ export class AccessibilityAuditService {
    * emits nothing and rejects on timeout. Focus does wrap: `Next` from the last
    * element returns to the first.
    *
+   * On timeout the move has already been sent, and nothing ties the daemon's
+   * push back to the move that caused it. A push landing after the wait gave up
+   * is delivered to the next caller, which then sees a stale element — so treat
+   * a timeout as "this connection is briefly out of step" and let it settle.
+   * Draining blindly does not work: a move that changes nothing is answered with
+   * silence, so the event discarded would as often be a real one.
+   *
    * @param direction Where to move; see {@link AxFocusDirection}.
    * @param options Timeout, and whether to draw the on-device highlight.
    */
   async moveFocus(direction: AxFocusDirection, options: InspectOptions = {}): Promise<AxInspectedElement> {
     const {timeoutMs = 15000, showVisuals = false} = options;
-    const pushed = this.transport.waitForInbound('hostInspectorCurrentElementChanged:', timeoutMs);
     this.setMonitoredEventType(MONITORED_EVENT_FOCUS);
     if (showVisuals) {
       this.setShowVisuals(true);
     }
     try {
+      // Registered before the move is sent so the push cannot be missed, and
+      // inside the try so it is always awaited: an abandoned waiter rejects with
+      // nothing listening once the connection closes, which is an unhandled
+      // rejection rather than an error the caller can catch.
+      const pushed = this.transport.waitForInbound('hostInspectorCurrentElementChanged:', timeoutMs);
       const aux = new MessageAux();
       // Every value is envelope-wrapped: a bare `{direction: n}` is accepted on
       // the wire but moves nothing.
@@ -476,15 +498,21 @@ export class AccessibilityAuditService {
   /**
    * Walks the focusable elements of whatever is on screen, in focus order.
    *
-   * Moves focus forward, yielding each element, and stops when focus returns to
-   * the one it started on — verified live: the daemon wraps from the last
-   * element back to the first rather than reporting an end.
+   * Moves focus forward, yielding each element, and stops once the sequence
+   * starts repeating — the daemon cycles rather than reporting an end.
    *
-   * The stop is keyed on what the element announces, not on
-   * {@link AxElement.platformElement}: the daemon issues a fresh handle for
-   * every focus event, so the same element carries different handles on
-   * successive visits. A screen whose *first* element announces exactly the
-   * same text as a later one therefore ends the walk early.
+   * What counts as a repeat is the step *between* two elements, not an element,
+   * because nothing the daemon sends identifies one. {@link
+   * AxElement.platformElement} is a fresh handle per focus event, and
+   * `accessibilityIdentifier` is absent on most elements, so a screen of
+   * lookalikes — a photo grid announcing "Photo, Image" over and over — offers
+   * nothing to tell its elements apart. Runs of identical announcements are
+   * therefore collapsed for repeat detection and still yielded individually,
+   * and the walk stops only when a *pair* of announcements recurs.
+   *
+   * The consequence worth knowing: a screen that legitimately repeats the same
+   * two announcements in sequence ends the walk early, and one where every
+   * element announces alike runs to the safety limit.
    *
    * A screen with nothing focusable yields nothing. Note the daemon reports what
    * is actually drawn, so an app that has not rendered looks empty.
@@ -511,13 +539,23 @@ export class AccessibilityAuditService {
    * @param options Timeout per step, and whether to draw the on-device highlight.
    */
   async *walkElements(options: InspectOptions = {}): AsyncGenerator<AxInspectedElement, void, unknown> {
-    let startedAt: string | undefined;
+    const steps = new Set<string>();
+    let previous: string | undefined;
+    let pending: AxInspectedElement | undefined;
     let direction: AxFocusDirection = AxFocusDirection.First;
 
     for (let step = 0; step < MAX_WALK_ELEMENTS; step += 1) {
       let element: AxInspectedElement;
       try {
-        element = await this.moveFocus(direction, options);
+        element = await this.moveFocus(
+          direction,
+          step === 0
+            ? {
+                ...options,
+                timeoutMs: Math.min(options.timeoutMs ?? FOCUS_FIRST_PROBE_TIMEOUT_MS, FOCUS_FIRST_PROBE_TIMEOUT_MS),
+              }
+            : options,
+        );
       } catch (error) {
         if (step > 0) {
           throw error;
@@ -531,23 +569,42 @@ export class AccessibilityAuditService {
       }
       direction = AxFocusDirection.Next;
 
-      if (!element.element?.platformElement) {
-        // Nothing focusable — an empty or undrawn screen.
-        log.debug('Focus returned no element; ending the walk');
-        return;
-      }
-      const announcement = element.caption ?? element.spokenDescription;
+      const announcement = element.element?.platformElement
+        ? (element.caption ?? element.spokenDescription)
+        : undefined;
       if (announcement === undefined) {
-        log.debug('Focus returned an element with no announcement; ending the walk');
+        // Nothing focusable, or nothing said about it: an empty or undrawn screen.
+        log.debug('Focus returned nothing to identify; ending the walk');
+        if (pending) {
+          yield pending;
+        }
         return;
       }
-      if (startedAt === undefined) {
-        startedAt = announcement;
-      } else if (announcement === startedAt) {
-        // Back where the walk began: the ring is complete.
-        return;
+
+      if (previous === undefined) {
+        previous = announcement;
+      } else if (announcement !== previous) {
+        const transition = `${previous}\u0000${announcement}`;
+        if (steps.has(transition)) {
+          // The sequence is repeating, so `pending` is a revisit rather than a
+          // new element and is dropped with it.
+          log.debug('Focus began repeating an earlier sequence; ending the walk');
+          return;
+        }
+        steps.add(transition);
+        previous = announcement;
       }
-      yield element;
+
+      // Held back one element: whatever completes a repeat has to be discarded,
+      // and that is only known once the *next* element arrives.
+      if (pending) {
+        yield pending;
+      }
+      pending = element;
+    }
+
+    if (pending) {
+      yield pending;
     }
     log.debug(`Walk stopped at the ${MAX_WALK_ELEMENTS}-element safety limit`);
   }
