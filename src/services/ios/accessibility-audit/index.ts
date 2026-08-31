@@ -62,15 +62,12 @@ const MONITORED_EVENT_OFF = 0;
  * Where {@link AccessibilityAuditService.moveFocus} sends the accessibility
  * focus. These are the daemon's own `direction` values, verified live.
  */
-export const AxFocusDirection = {
-  Previous: 3,
-  Next: 4,
-  First: 5,
-  Last: 6,
-} as const;
-
-/** A value of {@link AxFocusDirection}. */
-export type AxFocusDirection = (typeof AxFocusDirection)[keyof typeof AxFocusDirection];
+export enum AxFocusDirection {
+  Previous = 3,
+  Next = 4,
+  First = 5,
+  Last = 6,
+}
 
 /** Safety valve for {@link AccessibilityAuditService.walkElements}. */
 const MAX_WALK_ELEMENTS = 1000;
