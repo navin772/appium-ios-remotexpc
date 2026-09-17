@@ -1,3 +1,9 @@
+## [5.20.0](https://github.com/appium/appium-ios-remotexpc/compare/v5.19.2...v5.20.0) (2026-09-17)
+
+### Features
+
+* **amfi:** add AmfiService for Developer Mode control ([#328](https://github.com/appium/appium-ios-remotexpc/issues/328)) ([ebd8304](https://github.com/appium/appium-ios-remotexpc/commit/ebd8304b48f4e6bbda949dd7ccb6ddd6f7bec349)), closes [#325](https://github.com/appium/appium-ios-remotexpc/issues/325)
+
 ## [5.19.2](https://github.com/appium/appium-ios-remotexpc/compare/v5.19.1...v5.19.2) (2026-09-16)
 
 ### Bug Fixes
