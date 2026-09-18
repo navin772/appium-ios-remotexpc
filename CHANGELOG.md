@@ -1,3 +1,9 @@
+## [5.20.2](https://github.com/appium/appium-ios-remotexpc/compare/v5.20.1...v5.20.2) (2026-09-18)
+
+### Bug Fixes
+
+* match device udid lookups case-insensitively ([#332](https://github.com/appium/appium-ios-remotexpc/issues/332)) ([9c4e395](https://github.com/appium/appium-ios-remotexpc/commit/9c4e395c215c3950f41b1eb113d516465a02f8c6))
+
 ## [5.20.1](https://github.com/appium/appium-ios-remotexpc/compare/v5.20.0...v5.20.1) (2026-09-18)
 
 ### Bug Fixes
