@@ -1,3 +1,9 @@
+## [5.20.3](https://github.com/appium/appium-ios-remotexpc/compare/v5.20.2...v5.20.3) (2026-09-18)
+
+### Bug Fixes
+
+* guard BaseSocketService error re-emit to avoid unhandled EPIPE crash ([#333](https://github.com/appium/appium-ios-remotexpc/issues/333)) ([55c9de8](https://github.com/appium/appium-ios-remotexpc/commit/55c9de896d396a29791947e8d3a0dc3bc0d0a55b))
+
 ## [5.20.2](https://github.com/appium/appium-ios-remotexpc/compare/v5.20.1...v5.20.2) (2026-09-18)
 
 ### Bug Fixes
