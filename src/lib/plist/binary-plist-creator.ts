@@ -44,15 +44,14 @@ class BinaryPlistCreator {
       objectData.push(this._createObjectData(value));
     }
 
-    // Calculate offset table size
-    const maxOffset = this._calculateObjectDataLength(objectData);
-    this._offsetSize = this._calculateMinByteSize(maxOffset);
+    // Calculate offset table offset
+    const offsetTableOffset = BPLIST_MAGIC_AND_VERSION.length + this._calculateObjectDataLength(objectData);
+
+    // CoreFoundation requires the offset table offset itself to fit into the offset int size
+    this._offsetSize = this._calculateMinByteSize(offsetTableOffset);
 
     // Create offset table
     const offsetTable = this._createOffsetTable(objectOffsets);
-
-    // Calculate offset table offset
-    const offsetTableOffset = BPLIST_MAGIC_AND_VERSION.length + this._calculateObjectDataLength(objectData);
 
     // Create trailer
     const trailer = this._createTrailer(this._objectTable.length, offsetTableOffset);

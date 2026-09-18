@@ -116,6 +116,24 @@ describe('Plist Module', function () {
       assert.strictEqual(parsedObj.booleanTrue, true);
       assert.strictEqual(parsedObj.booleanFalse, false);
     });
+
+    it('should use an offset int size wide enough to address the offset table', function () {
+      // CoreFoundation rejects a binary plist whose offset table offset does not fit
+      // into the declared offset int size, even if every object offset does.
+      // Object data sizes just below 256 bytes put the offset table right past that limit.
+      for (let length = 230; length <= 270; length++) {
+        const obj = {value: 'x'.repeat(length)};
+        const binaryPlist = createBinaryPlist(obj);
+        const trailer = binaryPlist.subarray(binaryPlist.length - 32);
+        const offsetIntSize = trailer.readUInt8(6);
+        const offsetTableOffset = Number(trailer.readBigUInt64BE(24));
+        assert.ok(
+          offsetTableOffset < 2 ** (8 * offsetIntSize),
+          `offset table offset ${offsetTableOffset} does not fit into ${offsetIntSize} byte(s) (string length ${length})`,
+        );
+        assert.deepStrictEqual(parseBinaryPlist(binaryPlist), obj);
+      }
+    });
   });
 
   describe('Unified Plist Functions', function () {
