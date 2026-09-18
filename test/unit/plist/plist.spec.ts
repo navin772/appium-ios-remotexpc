@@ -19,6 +19,32 @@ import type {PlistDictionary} from '../../../src/lib/types.js';
 const PKG_ROOT = node.getModuleRootSync('appium-ios-remotexpc', fileURLToPath(import.meta.url));
 const FIXTURES_PATH = path.join(PKG_ROOT, 'test', 'unit', 'plist', 'fixtures');
 
+const BPLIST_TRAILER_LENGTH = 32;
+
+/**
+ * String lengths that make the encoded object data straddle the 256 byte mark, where
+ * the offset table starts past what a single byte offset can address.
+ */
+const OFFSET_TABLE_BOUNDARY_LENGTHS = Array.from({length: 101}, (_, index) => 200 + index);
+
+/**
+ * Reads the trailer fields CoreFoundation validates before parsing a binary plist.
+ */
+function readBinaryPlistTrailer(binaryPlist: Buffer): {
+  offsetIntSize: number;
+  objectRefSize: number;
+  numObjects: number;
+  offsetTableOffset: number;
+} {
+  const trailer = binaryPlist.subarray(binaryPlist.length - BPLIST_TRAILER_LENGTH);
+  return {
+    offsetIntSize: trailer.readUInt8(6),
+    objectRefSize: trailer.readUInt8(7),
+    numObjects: Number(trailer.readBigUInt64BE(8)),
+    offsetTableOffset: Number(trailer.readBigUInt64BE(24)),
+  };
+}
+
 describe('Plist Module', function () {
   let sampleXmlPlistPath: string;
   let sampleXmlPlistContent: string;
@@ -115,6 +141,27 @@ describe('Plist Module', function () {
       assert.ok(Math.abs(parsedObj.realValue - 3.14159) <= 0.00001);
       assert.strictEqual(parsedObj.booleanTrue, true);
       assert.strictEqual(parsedObj.booleanFalse, false);
+    });
+
+    it('should size the trailer integers so CoreFoundation accepts the result', function () {
+      // CoreFoundation rejects a binary plist whose offset table offset does not fit into the
+      // declared offset int size, even when every object offset does, and likewise whose object
+      // count does not fit into the object ref size.
+      for (const length of OFFSET_TABLE_BOUNDARY_LENGTHS) {
+        const obj = {value: 'x'.repeat(length)};
+        const binaryPlist = createBinaryPlist(obj);
+        const {offsetIntSize, objectRefSize, numObjects, offsetTableOffset} = readBinaryPlistTrailer(binaryPlist);
+
+        assert.ok(
+          offsetTableOffset < 2 ** (8 * offsetIntSize),
+          `offset table offset ${offsetTableOffset} does not fit into ${offsetIntSize} byte(s) (string length ${length})`,
+        );
+        assert.ok(
+          numObjects < 2 ** (8 * objectRefSize),
+          `object count ${numObjects} does not fit into ${objectRefSize} byte(s) (string length ${length})`,
+        );
+        assert.deepStrictEqual(parseBinaryPlist(binaryPlist), obj, `round-trip failed (string length ${length})`);
+      }
     });
   });
 

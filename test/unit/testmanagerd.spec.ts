@@ -11,6 +11,8 @@ import {
 import {TestmanagerdEncoder} from '../../src/services/ios/testmanagerd/testmanagerd-encoder.js';
 import {canonicalizeUuidString} from '../../src/services/ios/testmanagerd/uuid.js';
 import {createNSUUID} from '../../src/services/ios/testmanagerd/xctestconfiguration.js';
+import type {XCTestRunner} from '../../src/services/ios/testmanagerd/xcuitest.js';
+import {mockImport} from '../helpers/mock-module.js';
 
 /**
  * Testable subclass that exposes private methods for unit testing.
@@ -302,5 +304,59 @@ describe('DvtTestmanagedProxyService auxiliary helpers', function () {
       assert.strictEqual(parsed.length, 1);
       assert.strictEqual(parsed[0].$archiver, 'NSKeyedArchiver');
     });
+  });
+});
+
+describe('XCTestRunner', function () {
+  it('should launch the test runner in the background', async function (t) {
+    const runnerBundleId = 'com.example.Runner.xctrunner';
+    const targetBundleId = 'com.example.App';
+    const launchCalls: Record<string, any>[] = [];
+    const createFakeTestmanagerd = () => ({
+      makeChannel: async () => ({getCode: () => 1}),
+      sendMessage: async () => {},
+      recvPlist: async () => [{}],
+      close: async () => {},
+    });
+    const {XCTestRunner: MockedRunner} = await mockImport<{XCTestRunner: typeof XCTestRunner}>(
+      t,
+      '../../src/services/ios/testmanagerd/xcuitest.js',
+      import.meta.url,
+      {
+        '../../src/services.js': {
+          startXCTestServices: async () => ({
+            execTestmanagerd: createFakeTestmanagerd(),
+            controlTestmanagerd: createFakeTestmanagerd(),
+            dvtService: {close: async () => {}},
+            processControl: {
+              launch: async (options: Record<string, any>) => {
+                launchCalls.push(options);
+                throw new Error('launch intercepted');
+              },
+              kill: async () => {},
+            },
+            installationProxy: {
+              lookup: async () => ({
+                [runnerBundleId]: {Path: '/private/var/containers/Bundle/Application/A/Runner-Runner.app'},
+                [targetBundleId]: {Path: '/private/var/containers/Bundle/Application/B/App.app'},
+              }),
+              close: () => {},
+            },
+          }),
+        },
+      },
+    );
+
+    const runner = new MockedRunner({
+      udid: 'device-1',
+      testRunnerBundleId: runnerBundleId,
+      appUnderTestBundleId: targetBundleId,
+      xctestBundleId: 'com.example.Runner',
+    });
+    await assert.rejects(runner.run(), (err: any) => err.stage === 'launch_runner');
+
+    assert.strictEqual(launchCalls.length, 1);
+    assert.strictEqual(launchCalls[0].bundleId, runnerBundleId);
+    assert.strictEqual(launchCalls[0].extraOptions?.ActivateSuspended, true);
   });
 });

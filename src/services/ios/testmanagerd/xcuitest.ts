@@ -584,6 +584,9 @@ export class XCTestRunner extends EventEmitter<XCTestRunnerEvents> {
         environment: appEnv,
         arguments: this.options.launchArguments ?? [],
         killExisting: this.options.killExisting ?? true,
+        // Start the runner in the background like Xcode does. A foreground runner makes XCTest
+        // press Home to background itself, which fails with the Xcode 27 DDI on older iOS versions.
+        extraOptions: {ActivateSuspended: true},
       });
     } catch (err) {
       throw new XCTestRunError(`Failed to launch test runner: ${err instanceof Error ? err.message : String(err)}`, {
