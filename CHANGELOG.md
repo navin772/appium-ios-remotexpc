@@ -1,3 +1,9 @@
+## [5.20.1](https://github.com/appium/appium-ios-remotexpc/compare/v5.20.0...v5.20.1) (2026-09-18)
+
+### Bug Fixes
+
+* **xctest:** pass `ActivateSuspended: true` to background the WDA ([#331](https://github.com/appium/appium-ios-remotexpc/issues/331)) ([a25c257](https://github.com/appium/appium-ios-remotexpc/commit/a25c257c7d274f42b262675c09039136b8e53d0c))
+
 ## [5.20.0](https://github.com/appium/appium-ios-remotexpc/compare/v5.19.2...v5.20.0) (2026-09-17)
 
 ### Features
