@@ -1,3 +1,9 @@
+## [5.20.4](https://github.com/appium/appium-ios-remotexpc/compare/v5.20.3...v5.20.4) (2026-09-21)
+
+### Bug Fixes
+
+* **plist:** parse 1/2/4-byte integers as unsigned ([#334](https://github.com/appium/appium-ios-remotexpc/issues/334)) ([d02cbc5](https://github.com/appium/appium-ios-remotexpc/commit/d02cbc5655ce9458532ff0eece1584cea5d755ce))
+
 ## [5.20.3](https://github.com/appium/appium-ios-remotexpc/compare/v5.20.2...v5.20.3) (2026-09-18)
 
 ### Bug Fixes
