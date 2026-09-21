@@ -214,24 +214,20 @@ class BinaryPlistCreator {
       buffer.writeBigInt64BE(value, 1);
     }
     // For number values, determine the smallest representation
-    else if (value >= 0 && value <= 255) {
+    else if (value >= 0 && value <= 0xff) {
       buffer = Buffer.alloc(2);
       buffer.writeUInt8(BPLIST_TYPE.INT | 0, 0);
       buffer.writeUInt8(value, 1);
-    } else if (value >= -128 && value <= 127) {
-      buffer = Buffer.alloc(2);
-      buffer.writeUInt8(BPLIST_TYPE.INT | 0, 0);
-      buffer.writeInt8(value, 1);
-    } else if (value >= -32768 && value <= 32767) {
+    } else if (value > 0xff && value <= 0xffff) {
       buffer = Buffer.alloc(3);
       buffer.writeUInt8(BPLIST_TYPE.INT | 1, 0);
-      buffer.writeInt16BE(value, 1);
-    } else if (value >= -2147483648 && value <= 2147483647) {
+      buffer.writeUInt16BE(value, 1);
+    } else if (value > 0xffff && value <= 0xffffffff) {
       buffer = Buffer.alloc(5);
       buffer.writeUInt8(BPLIST_TYPE.INT | 2, 0);
-      buffer.writeInt32BE(value, 1);
+      buffer.writeUInt32BE(value, 1);
     } else {
-      // 64-bit integer - use BigInt directly to avoid precision issues
+      // Negatives too: only 8 bytes is unambiguous.
       buffer = Buffer.alloc(9);
       buffer.writeUInt8(BPLIST_TYPE.INT | 3, 0);
       buffer.writeBigInt64BE(BigInt(value), 1);
