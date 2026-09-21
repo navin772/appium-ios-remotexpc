@@ -1,3 +1,9 @@
+## [5.21.0](https://github.com/appium/appium-ios-remotexpc/compare/v5.20.4...v5.21.0) (2026-09-21)
+
+### Features
+
+* **companion-proxy:** register service and add integration tests ([#335](https://github.com/appium/appium-ios-remotexpc/issues/335)) ([46bb7e8](https://github.com/appium/appium-ios-remotexpc/commit/46bb7e8750847004bd6f98bec55e1c5e800d8db6))
+
 ## [5.20.4](https://github.com/appium/appium-ios-remotexpc/compare/v5.20.3...v5.20.4) (2026-09-21)
 
 ### Bug Fixes
