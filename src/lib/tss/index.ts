@@ -4,13 +4,13 @@ import axios from 'axios';
 
 import {getLogger} from '../logger.js';
 import {createPlist, parsePlist} from '../plist/index.js';
-import type {PlistDictionary} from '../types.js';
+import type {PlistDictionary, PlistValue, XPCDictionary} from '../types.js';
 
 const log = getLogger('TSSRequestor');
 
 // TSS Constants
 const TSS_CONTROLLER_ACTION_URL = 'http://gs.apple.com/TSS/controller?action=2';
-const TSS_CLIENT_VERSION_STRING = 'libauthinstall-1033.80.3';
+const TSS_CLIENT_VERSION_STRING = 'libauthinstall-1104.0.9';
 const TSS_SUCCESS_MESSAGE = 'SUCCESS';
 const TSS_REQUEST_TIMEOUT = 10000; // 10 seconds
 const TSS_RULE_IGNORE_VALUE = 255;
@@ -18,6 +18,17 @@ const TSS_RULE_IGNORE_VALUE = 255;
 export interface TSSResponse {
   [key: string]: any;
   ApImg4Ticket?: Buffer;
+  'Cryptex1,Ticket'?: Buffer;
+}
+
+/**
+ * A device's AppleImage4 chip instance, as cryptexd's `read-personalization-id` reports it
+ * (`img4_chip_chip` is the ChipID, `img4_chip_ecid` the ECID, `img4_chip_cpro` the production mode).
+ */
+export interface Img4ChipInstance extends XPCDictionary {
+  img4_chip_chip: number | bigint;
+  img4_chip_ecid: number | bigint;
+  img4_chip_cpro: number | bigint | boolean;
 }
 
 export interface RestoreRequestRule {
@@ -147,6 +158,55 @@ export class TSSRequest {
   }
 
   /**
+   * Build a Cryptex1 personalization request (`@Cryptex1,Ticket`).
+   *
+   * Unlike the AP request {@link getManifestFromTSS} builds, the device is identified by
+   * `Cryptex1,UDID` alone (no `Ap*` tags), and each personalized component contributes only
+   * its `Digest`. The generic DMG is declared `Personalize: false` and is left out.
+   *
+   * @param buildIdentity The build identity describing the cryptex (its `Cryptex1,*` keys).
+   * @param chipInstance The device's chip instance.
+   * @param nonce The nonce of the identity's `Cryptex1,NonceDomain`, as is (not hashed).
+   */
+  addCryptex1Tags(buildIdentity: PlistDictionary, chipInstance: Img4ChipInstance, nonce: Buffer): void {
+    const identityValue = (key: string): PlistValue => {
+      const value = buildIdentity[key];
+      if (value === undefined) {
+        throw new TSSError(`The build identity has no ${key}`);
+      }
+      return value;
+    };
+
+    this.update({
+      '@Cryptex1,Ticket': true,
+      'Cryptex1,ChipID': parseManifestInteger(identityValue('Cryptex1,ChipID')),
+      'Cryptex1,Type': identityValue('Cryptex1,Type'),
+      'Cryptex1,SubType': identityValue('Cryptex1,SubType'),
+      'Cryptex1,ProductClass': parseManifestInteger(identityValue('Cryptex1,ProductClass')),
+      'Cryptex1,UseProductClass': identityValue('Cryptex1,UseProductClass'),
+      'Cryptex1,NonceDomain': identityValue('Cryptex1,NonceDomain'),
+      'Cryptex1,Version': identityValue('Cryptex1,Version'),
+      'Cryptex1,PreauthorizationVersion': identityValue('Cryptex1,PreauthorizationVersion'),
+      'Cryptex1,Nonce': nonce,
+      'Cryptex1,ProductionMode': Boolean(chipInstance.img4_chip_cpro),
+      'Cryptex1,UDID': cryptex1Udid(chipInstance),
+      'Cryptex1,UniqueTagList': Buffer.alloc(0),
+    });
+
+    const manifest = (buildIdentity.Manifest ?? {}) as Record<string, ManifestEntry>;
+    for (const [key, entry] of Object.entries(manifest)) {
+      if (!key.startsWith('Cryptex1,')) {
+        continue;
+      }
+      if (!entry.Info?.Personalize) {
+        log.debug(`Skipping ${key} as it is not personalized`);
+        continue;
+      }
+      this.update({[key]: {Digest: entry.Digest ?? Buffer.alloc(0)}});
+    }
+  }
+
+  /**
    * Update the TSS request with additional options
    * @param options The options to add to the request
    */
@@ -210,6 +270,47 @@ export class TSSRequest {
       throw error;
     }
   }
+}
+
+/**
+ * The 16-byte `Cryptex1,UDID`: the ChipID and the ECID, each as a big-endian uint64.
+ */
+export function cryptex1Udid(chipInstance: Img4ChipInstance): Buffer {
+  const udid = Buffer.alloc(16);
+  udid.writeBigUInt64BE(BigInt(chipInstance.img4_chip_chip), 0);
+  udid.writeBigUInt64BE(BigInt(chipInstance.img4_chip_ecid), 8);
+  return udid;
+}
+
+/** Build manifests store some integers as strings, e.g. `Cryptex1,ChipID` is `'0xFF10'`. */
+function parseManifestInteger(value: PlistValue): number {
+  const parsed = typeof value === 'string' ? Number(value) : value;
+  if (typeof parsed !== 'number' || !Number.isSafeInteger(parsed)) {
+    throw new TSSError(`Expected an integer in the build identity, got ${String(value)}`);
+  }
+  return parsed;
+}
+
+/**
+ * Get a Cryptex1 personalization ticket from Apple's TSS.
+ * @param buildIdentity The build identity describing the cryptex (its `Cryptex1,*` keys)
+ * @param chipInstance The device's chip instance, from cryptexd `read-personalization-id`
+ * @param nonce The nonce of the identity's `Cryptex1,NonceDomain`
+ * @returns The ticket (an IM4M) to install the cryptex with
+ */
+export async function getCryptex1TicketFromTSS(
+  buildIdentity: PlistDictionary,
+  chipInstance: Img4ChipInstance,
+  nonce: Buffer,
+): Promise<Buffer> {
+  const request = new TSSRequest();
+  request.addCryptex1Tags(buildIdentity, chipInstance, nonce);
+  const response = await request.sendReceive();
+  const ticket = response['Cryptex1,Ticket'] ?? response.ApImg4Ticket;
+  if (!Buffer.isBuffer(ticket)) {
+    throw new TSSError('TSS response does not contain a Cryptex1,Ticket');
+  }
+  return ticket;
 }
 
 /**

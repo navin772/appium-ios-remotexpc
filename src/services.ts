@@ -12,6 +12,7 @@ import {type Service} from './services/ios/base-service.js';
 import {CompanionProxyService} from './services/ios/companion-proxy/index.js';
 import {ConfigurationService} from './services/ios/configuration/index.js';
 import {CrashReportsService} from './services/ios/crash-reports/index.js';
+import {CryptexdService} from './services/ios/cryptexd/index.js';
 import {DeviceControlService} from './services/ios/device-control/index.js';
 import {CoreDeviceInfoService} from './services/ios/device-info/index.js';
 import DiagnosticsService from './services/ios/diagnostic-service/index.js';
@@ -146,6 +147,14 @@ export async function startAppService(udid: string): Promise<AppService> {
 export async function startPasteboardService(udid: string): Promise<PasteboardService> {
   await requireCatalogService(udid, PasteboardService.RSD_SERVICE_NAME);
   return new PasteboardService(udid);
+}
+
+/**
+ * Start the cryptexd service (cryptex and Cryptex1 DeveloperDiskImage installs) for the given device UDID.
+ */
+export async function startCryptexdService(udid: string): Promise<CryptexdService> {
+  await requireCatalogService(udid, CryptexdService.RSD_SERVICE_NAME);
+  return new CryptexdService(udid);
 }
 
 /**

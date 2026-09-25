@@ -61,6 +61,18 @@ export type {
   ListAppsOptions,
 } from './services/ios/app-service/index.js';
 export {PasteboardService} from './services/ios/pasteboard/index.js';
+export {
+  CryptexdService,
+  CryptexdError,
+  DDI_CRYPTEX_IDENTIFIER,
+  loadCryptex1Assets,
+} from './services/ios/cryptexd/index.js';
+export type {
+  Cryptex1Assets,
+  CryptexInstallOptions,
+  CryptexInstallRequest,
+  InstalledCryptex,
+} from './services/ios/cryptexd/index.js';
 export {AccessibilityAuditService} from './services/ios/accessibility-audit/index.js';
 export type {AxDeviceSetting} from './services/ios/accessibility-audit/index.js';
 export {AxAuditDtxTransport} from './services/ios/accessibility-audit/dtx-transport.js';

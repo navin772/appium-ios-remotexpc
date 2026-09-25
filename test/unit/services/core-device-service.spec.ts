@@ -1,11 +1,15 @@
 import assert from 'node:assert/strict';
+import {EventEmitter} from 'node:events';
 import * as net from 'node:net';
 import {describe, it} from 'node:test';
 
 import {Http2Constants} from '../../../src/lib/remote-xpc/constants.js';
 import {RemoteXpcFramedTransport} from '../../../src/lib/remote-xpc/remote-xpc-framed-transport.js';
 import type {XPCDictionary, XPCValue} from '../../../src/lib/types.js';
-import {CoreDeviceService} from '../../../src/services/ios/core-device/core-device-service.js';
+import {
+  type CoreDeviceInvokeOptions,
+  CoreDeviceService,
+} from '../../../src/services/ios/core-device/core-device-service.js';
 import {buildMessage, buildUndecodableMessage} from '../remote-xpc/xpc-fixtures.js';
 
 const FEATURE = 'com.apple.coredevice.feature.test';
@@ -110,5 +114,87 @@ describe('CoreDeviceService transport wiring', function () {
     } finally {
       await service.close();
     }
+  });
+});
+
+/**
+ * Stands in for the device end of a request with file transfers, recording the order in which
+ * the request and its payloads go out.
+ * - `replyAfterTransfers`: replies once both payloads are in.
+ * - `replyEarly`: replies to the request itself; the payload pushes never finish.
+ * - `closeDuringTransfer`: the connection drops mid-push, as the real transport reports it.
+ */
+class FileTransferTransport extends EventEmitter {
+  isConnected = true;
+  readonly events: string[] = [];
+
+  constructor(private readonly mode: 'replyAfterTransfers' | 'replyEarly' | 'closeDuringTransfer') {
+    super();
+  }
+
+  sendDataFrame(): void {
+    this.events.push('request');
+    if (this.mode === 'replyEarly') {
+      queueMicrotask(() => this.emit('message', {early: true}));
+    }
+  }
+
+  async sendFileTransfer(transferId: number, data: Buffer): Promise<void> {
+    this.events.push(`transfer ${transferId}: ${data.toString()}`);
+    if (this.mode === 'replyEarly') {
+      await new Promise<void>(() => undefined);
+    }
+    if (this.mode === 'closeDuringTransfer') {
+      this.emit('close');
+      throw new Error(`RemoteXPC connection closed before file transfer stream 5 was sent`);
+    }
+    if (transferId === 2) {
+      queueMicrotask(() => this.emit('message', {installed: true}));
+    }
+  }
+
+  async close(): Promise<void> {}
+}
+
+class FileTransferCoreDeviceService extends CoreDeviceService {
+  constructor(private readonly fake: FileTransferTransport) {
+    super('test-udid', 'com.apple.coredevice.test');
+  }
+
+  async request(options: CoreDeviceInvokeOptions): Promise<XPCDictionary> {
+    return this.sendReceive({routine: 'install'}, options);
+  }
+
+  protected async createTransport(): Promise<RemoteXpcFramedTransport> {
+    return this.fake as unknown as RemoteXpcFramedTransport;
+  }
+}
+
+describe('CoreDeviceService file transfers', function () {
+  const fileTransfers = new Map([
+    [1, Buffer.from('image')],
+    [2, Buffer.from('ticket')],
+  ]);
+
+  it('pushes each payload after the request, in order, and returns the reply', async function () {
+    const fake = new FileTransferTransport('replyAfterTransfers');
+    const service = new FileTransferCoreDeviceService(fake);
+
+    assert.deepStrictEqual(await service.request({fileTransfers, timeoutMs: 2000}), {installed: true});
+    assert.deepStrictEqual(fake.events, ['request', 'transfer 1: image', 'transfer 2: ticket']);
+  });
+
+  it('returns a reply that arrives before the payloads are out', async function () {
+    const service = new FileTransferCoreDeviceService(new FileTransferTransport('replyEarly'));
+
+    assert.deepStrictEqual(await service.request({fileTransfers, timeoutMs: 2000}), {early: true});
+  });
+
+  it('fails at once, not at the timeout, when the connection drops during a push', async function () {
+    const service = new FileTransferCoreDeviceService(new FileTransferTransport('closeDuringTransfer'));
+    const start = performance.now();
+
+    await assert.rejects(service.request({fileTransfers, timeoutMs: 60_000}), /connection closed/);
+    assert.ok(performance.now() - start < 1000);
   });
 });

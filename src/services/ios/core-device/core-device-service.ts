@@ -42,6 +42,11 @@ export interface CoreDeviceInvokeOptions {
   actionIdentifier?: string;
   /** Override the default response timeout. */
   timeoutMs?: number;
+  /**
+   * Payloads for the {@link XPCFileTransfer} values announced in the request, keyed by
+   * transfer id. They are pushed in insertion order on the request's connection, right after it.
+   */
+  fileTransfers?: ReadonlyMap<number, Buffer>;
 }
 
 /**
@@ -203,29 +208,8 @@ export abstract class CoreDeviceService extends BaseService {
     input: XPCDictionary,
     options: CoreDeviceInvokeOptions,
   ): Promise<XPCValue> {
-    const transport = await this.refreshTransport();
     const request = this.buildEnvelope(featureIdentifier, input, options.actionIdentifier);
-
-    // Register the response listener before sending so a fast reply is not lost.
-    const responsePromise = this.waitForResponse(
-      transport,
-      options.timeoutMs ?? DEFAULT_INVOKE_TIMEOUT_MS,
-      featureIdentifier,
-    );
-
-    transport.sendDataFrame(
-      encodeMessage({
-        flags:
-          XpcConstants.XPC_FLAGS_ALWAYS_SET |
-          XpcConstants.XPC_FLAGS_DATA_PRESENT |
-          XpcConstants.XPC_FLAGS_WANTING_REPLY,
-        id: this.nextMessageId++,
-        body: request,
-      }),
-      Http2Constants.ROOT_CHANNEL,
-    );
-
-    const response = await responsePromise;
+    const response = await this.exchange(request, options, featureIdentifier);
     const output = response['CoreDevice.output'];
     if (output === undefined) {
       throw buildInvocationError(featureIdentifier, response);
@@ -234,8 +218,16 @@ export abstract class CoreDeviceService extends BaseService {
   }
 
   private async sendReceiveInternal(body: XPCDictionary, options: CoreDeviceInvokeOptions): Promise<XPCDictionary> {
+    return await this.exchange(body, options, options.actionIdentifier ?? '<raw>');
+  }
+
+  /** Sends `body` on a fresh connection, pushes its file-transfer payloads, and returns the reply. */
+  private async exchange(
+    body: XPCDictionary,
+    options: CoreDeviceInvokeOptions,
+    operationIdentifier: string | undefined,
+  ): Promise<XPCDictionary> {
     const transport = await this.refreshTransport();
-    const operationIdentifier = options.actionIdentifier ?? '<raw>';
 
     // Register the response listener before sending so a fast reply is not lost.
     const responsePromise = this.waitForResponse(
@@ -256,7 +248,10 @@ export abstract class CoreDeviceService extends BaseService {
       Http2Constants.ROOT_CHANNEL,
     );
 
-    return await responsePromise;
+    const transfersSent = pushFileTransfers(transport, options.fileTransfers);
+    // A failed push fails the call at once, but a reply that arrives before every payload
+    // is out (the device rejecting the request early) still wins.
+    return await Promise.race([responsePromise, transfersSent.then(() => responsePromise)]);
   }
 
   private buildEnvelope(
@@ -340,6 +335,15 @@ export abstract class CoreDeviceService extends BaseService {
       transport.once('error', onError);
       transport.once('close', onClose);
     });
+  }
+}
+
+async function pushFileTransfers(
+  transport: RemoteXpcFramedTransport,
+  fileTransfers: ReadonlyMap<number, Buffer> | undefined,
+): Promise<void> {
+  for (const [transferId, data] of fileTransfers ?? []) {
+    await transport.sendFileTransfer(transferId, data);
   }
 }
 
