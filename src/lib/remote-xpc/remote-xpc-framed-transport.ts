@@ -3,8 +3,8 @@ import net from 'node:net';
 
 import {getLogger} from '../logger.js';
 import type {XPCDictionary} from '../types.js';
-import {Http2Constants} from './constants.js';
-import {DataFrame} from './handshake-frames.js';
+import {Http2Constants, XpcConstants} from './constants.js';
+import {DataFrame, HeadersFrame} from './handshake-frames.js';
 import Handshake from './handshake.js';
 import {
   Http2FrameParser,
@@ -12,7 +12,8 @@ import {
   type PeerTeardownFrame,
   buildWindowUpdateFrames,
 } from './http2-frame-parser.js';
-import {decodeMessage, probeXpcFraming, XPC_WRAPPER_HEADER_SIZE} from './xpc-protocol.js';
+import {XPCFileTransfer} from './xpc-file-transfer.js';
+import {decodeMessage, encodeMessage, probeXpcFraming, XPC_WRAPPER_HEADER_SIZE} from './xpc-protocol.js';
 
 const log = getLogger('RemoteXpcFramedTransport');
 
@@ -31,6 +32,13 @@ interface PendingXpcMessage {
   byteLength?: number;
 }
 
+/** A payload waiting for send window. `endStream` entries finish a file transfer and settle its promise. */
+interface PendingSend {
+  streamId: number;
+  payload: Buffer;
+  endStream?: {resolve: () => void; reject: (error: Error) => void};
+}
+
 /**
  * Shared RemoteXPC transport: owns TCP socket lifecycle, HTTP/2/XPC handshake,
  * DATA frame parsing, window updates, and XPC message reassembly.
@@ -47,7 +55,10 @@ export class RemoteXpcFramedTransport extends EventEmitter {
   private peerInitialWindowSize: number = Http2Constants.DEFAULT_PEER_WINDOW_SIZE;
   private connectionSendWindow: number = Http2Constants.DEFAULT_PEER_WINDOW_SIZE;
   private streamSendWindows = new Map<number, number>();
-  private sendQueue: {streamId: number; payload: Buffer}[] = [];
+  private sendQueue: PendingSend[] = [];
+  private nextFileTransferStream: number = Http2Constants.FIRST_FILE_TRANSFER_STREAM;
+  /** The device resets a transfer stream once it has the payload; that reset is not an error. */
+  private finishedFileTransferStreams = new Set<number>();
 
   constructor(address: [string, number]) {
     super();
@@ -115,6 +126,43 @@ export class RemoteXpcFramedTransport extends EventEmitter {
   }
 
   /**
+   * Pushes the payload of an {@link XPCFileTransfer} announced in an earlier request.
+   *
+   * The bytes go on a fresh client-initiated (odd) stream whose preamble carries
+   * `transferId` as its message id, which is how the device matches the stream to
+   * the announcement. The payload follows the preamble immediately: the device's
+   * FILE_TX_STREAM_RESPONSE acknowledgement arrives after the data, and holding the
+   * stream open for it makes the device reset the stream.
+   *
+   * Resolves once the last frame is written, not when the device has consumed it.
+   */
+  async sendFileTransfer(transferId: number, data: Buffer): Promise<void> {
+    new XPCFileTransfer(transferId, data.length); // validates the id and size
+    const socket = this.socket;
+    if (!socket?.writable) {
+      throw new Error('RemoteXPC socket is not writable');
+    }
+    const streamId = this.nextFileTransferStream;
+    this.nextFileTransferStream += 2;
+
+    socket.write(new HeadersFrame(streamId, Buffer.alloc(0), ['END_HEADERS']).serialize());
+    const preamble = encodeMessage({
+      flags: XpcConstants.XPC_FLAGS_FILE_TX_STREAM_REQUEST | XpcConstants.XPC_FLAGS_ALWAYS_SET,
+      id: BigInt(transferId),
+      body: null,
+    });
+    const sent = new Promise<void>((resolve, reject) => {
+      this.sendQueue.push(
+        {streamId, payload: preamble},
+        {streamId, payload: data},
+        {streamId, payload: Buffer.alloc(0), endStream: {resolve, reject}},
+      );
+    });
+    this.flushPendingSends();
+    return await sent;
+  }
+
+  /**
    * Writes queued payloads as DATA frames no larger than the peer's max frame size
    * or its send windows. Stops at the first blocked payload so ordering holds.
    */
@@ -131,10 +179,16 @@ export class RemoteXpcFramedTransport extends EventEmitter {
       if (size <= 0 && send.payload.length > 0) {
         return;
       }
-      socket.write(new DataFrame(send.streamId, send.payload.subarray(0, size), []).serialize());
+      socket.write(
+        new DataFrame(send.streamId, send.payload.subarray(0, size), send.endStream ? ['END_STREAM'] : []).serialize(),
+      );
       this.consumeSendWindow(send.streamId, size);
       if (size === send.payload.length) {
         this.sendQueue.shift();
+        if (send.endStream) {
+          this.finishedFileTransferStreams.add(send.streamId);
+          send.endStream.resolve();
+        }
       } else {
         send.payload = send.payload.subarray(size);
       }
@@ -180,6 +234,7 @@ export class RemoteXpcFramedTransport extends EventEmitter {
   async close(): Promise<void> {
     this.closing = true;
     this.connected = false;
+    this.rejectPendingFileTransfers();
 
     const socket = this.socket;
     if (!socket) {
@@ -249,6 +304,7 @@ export class RemoteXpcFramedTransport extends EventEmitter {
         return;
       }
       this.connected = false;
+      this.rejectPendingFileTransfers();
       this.emit('close');
     });
   }
@@ -278,6 +334,12 @@ export class RemoteXpcFramedTransport extends EventEmitter {
           this.flushPendingSends();
           break;
         case 'rstStream':
+          if (this.finishedFileTransferStreams.delete(frame.streamId)) {
+            log.debug(`Peer reset finished file transfer stream ${frame.streamId}`);
+            break;
+          }
+          this.handlePeerTeardown(frame);
+          return;
         case 'goAway':
           this.handlePeerTeardown(frame);
           return;
@@ -467,6 +529,16 @@ export class RemoteXpcFramedTransport extends EventEmitter {
     });
   }
 
+  private rejectPendingFileTransfers(): void {
+    const pending = this.sendQueue;
+    this.sendQueue = [];
+    for (const send of pending) {
+      send.endStream?.reject(
+        new Error(`RemoteXPC connection closed before file transfer stream ${send.streamId} was sent`),
+      );
+    }
+  }
+
   private resetConnectionState(): void {
     this.frameParser = new Http2FrameParser();
     this.pendingXpcData.clear();
@@ -475,6 +547,8 @@ export class RemoteXpcFramedTransport extends EventEmitter {
     this.peerInitialWindowSize = Http2Constants.DEFAULT_PEER_WINDOW_SIZE;
     this.connectionSendWindow = Http2Constants.DEFAULT_PEER_WINDOW_SIZE;
     this.streamSendWindows.clear();
-    this.sendQueue = [];
+    this.rejectPendingFileTransfers();
+    this.nextFileTransferStream = Http2Constants.FIRST_FILE_TRANSFER_STREAM;
+    this.finishedFileTransferStreams.clear();
   }
 }

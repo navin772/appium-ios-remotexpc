@@ -213,6 +213,15 @@ export interface IXPCUUID {
 }
 
 /**
+ * Announces an outbound XPC file transfer whose bytes travel on their own
+ * stream. Implemented by {@link XPCFileTransfer}.
+ */
+export interface IXPCFileTransfer {
+  readonly transferId: number;
+  readonly size: number;
+}
+
+/**
  * Represents a value that can be encoded in XPC protocol
  */
 export type XPCValue =
@@ -224,6 +233,7 @@ export type XPCValue =
   | Buffer
   | Uint8Array
   | IXPCUUID
+  | IXPCFileTransfer
   | XPCArray
   | XPCDictionary
   | null;

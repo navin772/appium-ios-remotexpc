@@ -1,5 +1,6 @@
 import type {XPCArray, XPCDictionary, XPCValue} from '../types.js';
 import {Http2Constants} from './constants.js';
+import {XPCFileTransfer} from './xpc-file-transfer.js';
 import {XPCUUID} from './xpc-uuid.js';
 
 // Constants for XPC protocol.
@@ -379,6 +380,12 @@ function encodeObject(writer: Writer, value: XPCValue): void {
     writer.writeBuffer(value.uuidBytes); // Fixed 16 bytes: no length prefix, no padding.
     return;
   }
+  if (value instanceof XPCFileTransfer) {
+    writer.writeUInt32LE(XPC_TYPES.fileTransfer);
+    writer.writeBigUInt64LE(value.transferId);
+    encodeDictionary(writer, {s: BigInt(value.size)});
+    return;
+  }
   if (Buffer.isBuffer(value) || value instanceof Uint8Array) {
     const data = Buffer.isBuffer(value) ? value : Buffer.from(value);
     writer.writeUInt32LE(XPC_TYPES.data);
@@ -401,8 +408,8 @@ function encodeObject(writer: Writer, value: XPCValue): void {
     return;
   }
   if (typeof value === 'object') {
-    // Anything left is a dictionary. `IXPCUUID` was handled above; the cast
-    // covers the fact that `instanceof` narrows the class but not the interface.
+    // Anything left is a dictionary. `IXPCUUID` and `IXPCFileTransfer` were handled above;
+    // the cast covers the fact that `instanceof` narrows the class but not the interface.
     encodeDictionary(writer, value as XPCDictionary);
     return;
   }

@@ -77,6 +77,7 @@
     "test:mobile-config": "node --enable-source-maps --test --test-timeout=60000 \"build/test/integration/mobile-config.spec.js\"",
     "test:mobile-image-mounter": "node --enable-source-maps --test --test-timeout=60000 \"build/test/integration/mobile-image-mounter.spec.js\"",
     "test:notification-proxy": "node --enable-source-maps --test --test-timeout=60000 \"build/test/integration/notification-proxy.spec.js\"",
+    "test:remote-xpc-file-transfer": "node --enable-source-maps --test --test-timeout=60000 \"build/test/integration/remote-xpc-file-transfer.spec.js\"",
     "test:pasteboard-service": "node --enable-source-maps --test --test-timeout=60000 \"build/test/integration/pasteboard-service.spec.js\"",
     "test:port-forwarding": "node --enable-source-maps --test --test-timeout=60000 \"build/test/integration/port-forwarding.spec.js\"",
     "test:power-assertion": "node --enable-source-maps --test --test-timeout=60000 \"build/test/integration/power-assertion.spec.js\"",

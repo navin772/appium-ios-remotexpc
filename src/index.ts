@@ -24,6 +24,7 @@ export type {
 } from './lib/port-forwarding/index.js';
 export type {RsdServiceCatalogClient} from './lib/remote-xpc/rsd-service-catalog-client.js';
 export {XPCUUID} from './lib/remote-xpc/xpc-uuid.js';
+export {XPCFileTransfer} from './lib/remote-xpc/xpc-file-transfer.js';
 /**
  * @deprecated Use RsdServiceCatalogClient instead.
  */
