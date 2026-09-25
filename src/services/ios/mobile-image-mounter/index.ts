@@ -81,7 +81,12 @@ class MobileImageMounterService extends BaseService implements MobileImageMounte
    */
   async isPersonalizedImageMounted(): Promise<boolean> {
     try {
-      return (await this.lookup()).length > 0;
+      if ((await this.lookup()).length > 0) {
+        return true;
+      }
+      // iOS 27 can return an empty ImageSignature from LookupImage while the image is mounted
+      const entries = await this.copyDevices();
+      return entries.some((entry) => entry?.DiskImageType === MobileImageMounterService.IMAGE_TYPE);
     } catch {
       return false;
     }
